@@ -140,10 +140,14 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   // gravity/ground collision (Y) bring back down rather than a permanent velocity
   // change. Bails immediately when knockback is 0 (the default) -- the common case --
   // so unaffected enemies pay no per-hit cost beyond this one check.
-  applyKnockback(angle) {
-    if (!this.knockback) return;
+  //
+  // scale (0..1, default 1) multiplies the knockback speed -- pass a bullet's
+  // knockbackScale here (see Player.fireWeapon) so a barely-charged hit shoves an
+  // enemy less than a fully-charged one, same proportion as its damage.
+  applyKnockback(angle, scale = 1) {
+    if (!this.knockback || !scale) return;
     const knockbackVec = new Phaser.Math.Vector2();
-    this.scene.physics.velocityFromRotation(angle, this.knockback, knockbackVec);
+    this.scene.physics.velocityFromRotation(angle, this.knockback * scale, knockbackVec);
     this.setVelocity(this.body.velocity.x + knockbackVec.x, this.body.velocity.y + knockbackVec.y);
   }
 

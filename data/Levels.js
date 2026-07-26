@@ -106,7 +106,7 @@ export const LEVELS = [
                 affectedByGravity: true,
                 projectileSpeed: 400,
                 projectileCount: 1,
-                knockback: 250,
+                knockback: 300,
                 leftDist: 550,
             },
             {

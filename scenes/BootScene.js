@@ -33,8 +33,8 @@ export class BootScene extends Phaser.Scene {
         // angle convention (and with velocityFromRotation(0, ...) also pointing +x).
         g.clear();
         g.fillStyle(BULLET_PLAYER_TINT, 1);
-        g.fillRect(0, 0, 14, 4);
-        g.generateTexture("bulletPlayer", 10, 4);
+        g.fillRect(0, 0, 16, 4);
+        g.generateTexture("bulletPlayer", 12, 4);
 
         // Enemy Bullet -- same shape/orientation convention as the player bullet.
         g.clear();

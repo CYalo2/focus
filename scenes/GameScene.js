@@ -1,4 +1,4 @@
-import { BULLET_TIME_MULTIPLIER, DEFAULT_WORLD_BOUNDS, BULLET_OFFSCREEN_MARGIN, HIT_FLASH_BRIGHTEN_AMOUNT, DEPTH, BULLET_PLAYER_TINT, BULLET_ENEMY_TINT } from "../data/Constants.js";
+import { BULLET_TIME_MULTIPLIER, DEFAULT_WORLD_BOUNDS, BULLET_OFFSCREEN_MARGIN, HIT_FLASH_BRIGHTEN_AMOUNT, CHARGE_MIN_OPACITY, DEPTH, BULLET_PLAYER_TINT, BULLET_ENEMY_TINT } from "../data/Constants.js";
 import { lightenColor } from "../data/ColorUtils.js";
 import { LEVELS } from "../data/Levels.js";
 import { WEAPONS, applyWeaponSpread } from "../data/Weapons.js";
@@ -266,7 +266,7 @@ export class GameScene extends Phaser.Scene {
     this.explodeBullet(bullet, enemy);
     spawnBulletBreakParticles(this, bullet.x, bullet.y, BULLET_PLAYER_TINT);
     bullet.destroy();
-    enemy.applyKnockback(bulletAngle);
+    enemy.applyKnockback(bulletAngle, bullet.knockbackScale !== undefined ? bullet.knockbackScale : 1);
     const dead = enemy.hit(damage);
     if (dead) {
       spawnEnemyDeathParticles(this, enemy.x, enemy.y);
@@ -287,9 +287,12 @@ export class GameScene extends Phaser.Scene {
   // through in a single shot. No explodesOnHit handling here since it's driven by a
   // per-bullet flag the beam doesn't have (see Weapons.js beam entry); a future
   // exploding beam could add that back in.
-  hitEnemyWithBeam(enemy, damage, angle) {
+  //
+  // knockbackScale (default 1) mirrors bullet.knockbackScale in hitEnemy() -- pass
+  // the beam's charge ratio here so a barely-charged beam shoves less.
+  hitEnemyWithBeam(enemy, damage, angle, knockbackScale = 1) {
     spawnBulletBreakParticles(this, enemy.x, enemy.y, BULLET_PLAYER_TINT);
-    enemy.applyKnockback(angle);
+    enemy.applyKnockback(angle, knockbackScale);
     const dead = enemy.hit(damage);
     if (dead) {
       spawnEnemyDeathParticles(this, enemy.x, enemy.y);
@@ -347,8 +350,11 @@ export class GameScene extends Phaser.Scene {
   // resolves everything in one step: find how far the beam reaches before a solid
   // (normal/enemyPassthrough) platform stops it, then damage every breakable
   // platform and every enemy it pierces through along the way, then draw the beam.
-  fireBeamWeapon(player, pointer) {
+  // chargeRatio (0, 1]: how charged the shot was at release -- see
+  // Player.getChargeRatio(). Defaults to 1 (fully charged) same as fireWeapon().
+  fireBeamWeapon(player, pointer, chargeRatio = 1) {
     const weapon = player.weapon;
+    const damage = weapon.damage * chargeRatio;
     const aimAngle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
     const angle = applyWeaponSpread(weapon, aimAngle);
     const dx = Math.cos(angle);
@@ -377,7 +383,7 @@ export class GameScene extends Phaser.Scene {
       if (!platform || !platform.active) return;
       const t = this.raycastRect(player.x, player.y, dx, dy, platform.body);
       if (t !== null && t <= beamLength) {
-        this.damagePlatformAtPoint(player.x + dx * t, player.y + dy * t, platform, weapon.damage, BULLET_PLAYER_TINT);
+        this.damagePlatformAtPoint(player.x + dx * t, player.y + dy * t, platform, damage, BULLET_PLAYER_TINT);
       }
     });
 
@@ -388,11 +394,11 @@ export class GameScene extends Phaser.Scene {
       if (!enemy || !enemy.active) return;
       const t = this.raycastRect(player.x, player.y, dx, dy, enemy.body);
       if (t !== null && t <= beamLength) {
-        this.hitEnemyWithBeam(enemy, weapon.damage, angle);
+        this.hitEnemyWithBeam(enemy, damage, angle, chargeRatio);
       }
     });
 
-    this.spawnBeamEffect(player.x, player.y, angle, beamLength, weapon.beamWidth || 6);
+    this.spawnBeamEffect(player.x, player.y, angle, beamLength, weapon.beamWidth || 6, chargeRatio);
 
     if (weapon.recoil) {
       const recoilVec = new Phaser.Math.Vector2();
@@ -429,8 +435,15 @@ export class GameScene extends Phaser.Scene {
 
   // Brief rectangle flash along the beam's path -- fades out fast since the beam
   // itself is resolved instantly rather than travelling like a bullet.
-  spawnBeamEffect(x, y, angle, length, width) {
-    const beam = this.add.rectangle(x, y, length, width, BULLET_PLAYER_TINT, 0.9);
+  //
+  // chargeRatio (default 1) scales the beam's base 0.9 opacity down toward
+  // CHARGE_MIN_OPACITY the same way Player.fireWeapon scales a regular bullet's
+  // alpha -- a barely-charged beam reads as noticeably fainter than a fully-charged
+  // one, on top of dealing less damage/knockback.
+  spawnBeamEffect(x, y, angle, length, width, chargeRatio = 1) {
+    const baseOpacity = 0.9;
+    const opacity = baseOpacity * (CHARGE_MIN_OPACITY + (1 - CHARGE_MIN_OPACITY) * chargeRatio);
+    const beam = this.add.rectangle(x, y, length, width, BULLET_PLAYER_TINT, opacity);
     beam.setOrigin(0, 0.5);
     beam.setRotation(angle);
     beam.setDepth(DEPTH.bullet);
@@ -495,6 +508,16 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.physics.pause();
+    // Same reset as loseLevel() -- if bullet time is still active (SHIFT held) at the
+    // moment of winning, this.time/tweens/physics.world timeScale would otherwise stay
+    // slowed. Scene.start('GameScene', ...) for the next level reuses this same scene
+    // instance rather than creating a fresh one, so this.time persists across it just
+    // like it does across a restart -- without this, weapon cooldowns (and everything
+    // else scaled by time.timeScale) would start the next level still in slow motion.
+    this.bulletTimeActive = false;
+    this.physics.world.timeScale = 1;
+    this.time.timeScale = 1;
+    this.tweens.timeScale = 1;
     const elapsedMs = this.elapsedMs;
     let isNewBest = false;
     try {
@@ -505,7 +528,7 @@ export class GameScene extends Phaser.Scene {
     showEndScreen(this, 'LEVEL COMPLETE', '#63c722', true, elapsedMs, isNewBest);
   }
 
-  loseLevel() {
+  loseLevel(message = 'YOU DIED') {
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.physics.pause();
@@ -519,7 +542,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = 1;
     this.time.timeScale = 1;
     this.tweens.timeScale = 1;
-    showEndScreen(this, 'YOU DIED', '#e24b4a', false);
+    showEndScreen(this, message, '#e24b4a', false);
   }
 
   update(time, delta) {
@@ -604,7 +627,7 @@ export class GameScene extends Phaser.Scene {
 
     // --- time limit expired = death ---
     if (this.timeLimitMs !== null && this.timeRemainingMs <= 0) {
-      this.loseLevel();
+      this.loseLevel("TIME'S UP");
     }
   }
 }

@@ -1,4 +1,4 @@
-import { PLAYER_STATS, GRAVITY, DASH, CHARGING_TINT, CHARGE_READY_TINT, DEPTH } from "../data/Constants.js";
+import { PLAYER_STATS, GRAVITY, DASH, CHARGING_TINT, CHARGE_READY_TINT, CHARGE_MIN_OPACITY, DEPTH } from "../data/Constants.js";
 import { WEAPON_FIRE_MODE, applyWeaponSpread } from "../data/Weapons.js";
 import { createBullet } from "./Bullet.js";
 import { spawnDashParticles } from "../fx/Particles.js";
@@ -40,23 +40,34 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.dashCooldownRemainingMs = 0; // counts down between dashes, scaled by bullet time
   }
 
-  fireWeapon(pointer, bulletGroup) {
+  // chargeRatio (0, 1]: how charged the shot was at release -- see getChargeRatio().
+  // Defaults to 1 (fully charged) so COOLDOWN-mode weapons and any other caller that
+  // doesn't pass one keep firing at full strength, unaffected.
+  fireWeapon(pointer, bulletGroup, chargeRatio = 1) {
     // Beam weapons are instant/hitscan rather than a travelling projectile -- the
     // scene owns the platform/enemy groups a beam needs to raycast against, so it
     // (not Player) does the actual hit-detection, damage, and visual. This also
     // covers the beam's own recoil kick, so we return before the bullet-specific
     // logic below.
     if (this.weapon.isBeam) {
-      this.scene.fireBeamWeapon(this, pointer);
+      this.scene.fireBeamWeapon(this, pointer, chargeRatio);
       return;
     }
 
     const aimAngle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
     const angle = applyWeaponSpread(this.weapon, aimAngle);
     const bullet = createBullet(this.scene, bulletGroup, 'bulletPlayer', this.x, this.y, angle, this.weapon.projectileSpeed);
-    bullet.damage = this.weapon.damage;
+    bullet.damage = this.weapon.damage * chargeRatio;
     bullet.explodesOnHit = !!this.weapon.explodesOnHit;
     bullet.explosionRadius = this.weapon.explosionRadius || 0;
+    // Carried alongside damage so the bullet/enemy collision handler can scale
+    // knockback the same way -- pass this into enemy.applyKnockback(angle, scale)
+    // instead of the enemy's full knockback every time.
+    bullet.knockbackScale = chargeRatio;
+    // Partial charge reads as partial opacity: CHARGE_MIN_OPACITY at chargeRatio 0,
+    // fully opaque at chargeRatio 1. A no-op (alpha 1) when chargeRatio is 1, which
+    // covers every weapon that doesn't define minChargeMs.
+    bullet.setAlpha(CHARGE_MIN_OPACITY + (1 - CHARGE_MIN_OPACITY) * chargeRatio);
 
     if (this.weapon.recoil) {
       const recoilVec = new Phaser.Math.Vector2();
@@ -75,11 +86,31 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.chargeElapsedMs += scaledDelta;
     }
     if (leftReleasedThisFrame) {
-      if (this.isCharging && this.chargeElapsedMs >= this.weapon.chargeTimeMs) {
-        this.fireWeapon(pointer, bulletGroup);
+      if (this.isCharging) {
+        const chargeRatio = this.getChargeRatio();
+        if (chargeRatio !== null) {
+          this.fireWeapon(pointer, bulletGroup, chargeRatio);
+        }
       }
       this.isCharging = false;
     }
+  }
+
+  // How "charged" the current hold is at release, as a proportion in (0, 1] -- or
+  // null if it hasn't charged enough to fire at all yet.
+  // Weapons without minChargeMs keep the old all-or-nothing behavior: null below
+  // chargeTimeMs, 1 at or above it (releasing early just doesn't fire, same as ever).
+  // Weapons with minChargeMs can release early instead, scaled linearly from
+  // minChargeMs (ratio ~0, just barely qualifies) up to chargeTimeMs (ratio 1).
+  getChargeRatio() {
+    const { chargeTimeMs, minChargeMs } = this.weapon;
+    if (minChargeMs === undefined) {
+      return this.chargeElapsedMs >= chargeTimeMs ? 1 : null;
+    }
+    if (this.chargeElapsedMs < minChargeMs) return null;
+    if (this.chargeElapsedMs >= chargeTimeMs) return 1;
+    const span = chargeTimeMs - minChargeMs;
+    return span > 0 ? (this.chargeElapsedMs - minChargeMs) / span : 1;
   }
 
   // WEAPON_FIRE_MODE.COOLDOWN: fires on click, then can't fire again until cooldownMs

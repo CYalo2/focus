@@ -13,6 +13,8 @@ export const ENEMY_KNOCKBACK_DRAG = 1400;
 export const CHARGING_TINT = 0xff8a3a;
 export const CHARGE_READY_TINT = 0xffe066;
 
+export const CHARGE_MIN_OPACITY = 0.3;
+
 export const DASH = {
     speed: 1400,
     drag: 5300,

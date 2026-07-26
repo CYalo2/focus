@@ -2,6 +2,16 @@ import { WEAPON_MAX_INACCURACY_RAD } from "./Constants.js";
 
 // CHARGE: hold click to charge, release to fire; movement/jump multipliers apply
 // while charging. Requires chargeTimeMs.
+//   Optional minChargeMs lets the weapon fire early on release instead of requiring
+//   a full chargeTimeMs hold -- releasing anywhere from minChargeMs up to
+//   chargeTimeMs still fires, at a proportional "charge ratio" of
+//   (elapsed - minChargeMs) / (chargeTimeMs - minChargeMs), 0 (just barely
+//   qualified) to 1 (fully charged). That ratio scales the fired projectile's
+//   damage and knockback, and its visual opacity between CHARGE_MIN_OPACITY and 1
+//   -- see Player.getChargeRatio()/fireWeapon() and Enemy.applyKnockback(). Releasing
+//   before minChargeMs doesn't fire at all, same as releasing early already didn't.
+//   Leaving minChargeMs undefined keeps the old all-or-nothing behavior: only a
+//   release at or after chargeTimeMs fires, always at full ratio (1).
 // COOLDOWN: fires immediately on click, then can't fire again until cooldownMs
 // elapses; movement/jump multipliers apply during that cooldown instead. Requires
 // cooldownMs.
@@ -29,14 +39,14 @@ export function applyWeaponSpread(weapon, baseAngle) {
 export const WEAPONS = {
     default: {
         name: "Default",
-        fireMode: WEAPON_FIRE_MODE.COOLDOWN,
-        cooldownMs: 150,
-        moveSpeedMultiplier: 0.8,
-        jumpMultiplier: 0.7,
-        projectileSpeed: 800,
-        recoil: 0,
-        damage: 0.3,
-        accuracy: 0.7,
+        fireMode: WEAPON_FIRE_MODE.CHARGE,
+        chargeTimeMs: 300,
+        minChargeMs: 100,
+        moveSpeedMultiplier: 0.5,
+        jumpMultiplier: 0.5,
+        projectileSpeed: 900,
+        recoil: 300,
+        damage: 1,
     },
 
     // Same stats as `default`, but isBeam: true replaces the travelling projectile
