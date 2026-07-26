@@ -1,0 +1,1318 @@
+import { DEFAULT_WORLD_BOUNDS } from "./Constants.js";
+
+export const LEVELS = [
+    {
+        name: "Primer",
+        worldBounds: {
+            width: 3180,
+            height: 750
+        },
+        playerSpawn: {
+            x: 50,
+            y: 550
+        },
+        timeLimitMs: 300000,
+        platforms: [
+            { x1: 0, y1: 600, x2: 3000, y2: 760, type: "normal" },
+
+            { x1: 840, y1: 440, x2: 870, y2: 600, type: "normal" },
+            { x1: 610, y1: 0, x2: 640, y2: 470, type: "normal" },
+            { x1: 640, y1: 440, x2: 840, y2: 470, type: "oneway" },
+
+            { x1: 1100, y1: 300, x2: 1300, y2: 330, type: "normal" },
+
+            { x1: 1970, y1: 280, x2: 2000, y2: 600, type: "normal" },
+            { x1: 2000, y1: 280, x2: 2200, y2: 310, type: "oneway" },
+            { x1: 2200, y1: 0, x2: 2230, y2: 310, type: "normal" },
+
+            { x1: 2600, y1: 0, x2: 2630, y2: 600, type: "breakable", health: 1 },
+
+            { x1: 3000, y1: 600, x2: 3150, y2: 630, type: "breakable", health: 3 },
+            { x1: 3150, y1: 600, x2: 3180, y2: 720, type: "normal" },
+            { x1: 3000, y1: 720, x2: 3180, y2: 750, type: "normal" },
+        ],
+        texts: [
+            { x: 250, y: 240, text: "Focus:", fontSize: "96px", color: "#7abfff" },
+            { x: 1600, y: 200, text: "Right Click to Dash" },
+            { x: 2350, y: 470, text: "Hold Left Click to Attack" },
+        ],
+        enemies: [],
+        goal: {
+            x: 3075,
+            y: 690
+        },
+        weapon: "default",
+    },
+    {
+        name: "Perspicacious",
+        worldBounds: {
+            width: 2850,
+            height: 900
+        },
+        playerSpawn: {
+            x: 50,
+            y: 550
+        },
+        timeLimitMs: 150000,
+        platforms: [
+            { x1: 0, y1: 600, x2: 600, y2: 900, type: "normal" },
+            { x1: 600, y1: 850, x2: 1100, y2: 900, type: "normal" },
+            { x1: 1100, y1: 600, x2: 1400, y2: 900, type: "normal" },
+
+            { x1: 1370, y1: 850, x2: 1930, y2: 900, type: "normal" },
+            { x1: 1400, y1: 600, x2: 1500, y2: 630, type: "normal" },
+            { x1: 1500, y1: 600, x2: 1800, y2: 630, type: "bulletPassthrough" },
+            { x1: 1800, y1: 600, x2: 1900, y2: 630, type: "normal" },
+            { x1: 1600, y1: 820, x2: 1700, y2: 850, type: "breakable", health: 1 },
+            { x1: 1900, y1: 600, x2: 1930, y2: 850, type: "bounceable" },
+            { x1: 1930, y1: 600, x2: 1970, y2: 630, type: "enemyPassthrough" },
+            { x1: 1930, y1: 820, x2: 2100, y2: 850, type: "bounceable" },
+            { x1: 1970, y1: 600, x2: 2000, y2: 780, type: "bounceable" },
+            { x1: 2000, y1: 750, x2: 2100, y2: 780, type: "bounceable" },
+            { x1: 2000, y1: 720, x2: 2100, y2: 750, type: "normal" },
+            { x1: 2025, y1: 250, x2: 2075, y2: 300, type: "redirect", direction: 90 },
+            { x1: 1930, y1: 850, x2: 2850, y2: 900, type: "normal" },
+
+            { x1: 2380, y1: 160, x2: 2410, y2: 750, type: "normal" },
+            { x1: 2380, y1: 750, x2: 2410, y2: 850, type: "breakable", health: 3 },
+            { x1: 2820, y1: 160, x2: 2850, y2: 850, type: "normal" },
+            { x1: 2410, y1: 160, x2: 2820, y2: 190, type: "normal" },
+            { x1: 2410, y1: 490, x2: 2690, y2: 520, type: "normal" },
+        ],
+        texts: [
+            { x: 850, y: 520, text: "Quickly Defeat Every Enemy" },
+            { x: 1650, y: 520, text: "Utilize Different Wall Types" },
+            { x: 2190, y: 660, text: "Hold Shift to Activate Focus" },
+            { x: 2190, y: 690, text: "Focus Doesn't Slow Down The Timer" },
+        ],
+        enemies: [
+            {
+                x: 850,
+                y: 800,
+                type: "default",
+                health: 2,
+                accuracy: 0.3,
+                affectedByGravity: false,
+                projectileSpeed: 400,
+                projectileCount: 1,
+            },
+            {
+                x: 1650,
+                y: 800,
+                type: "default",
+                health: 2,
+                accuracy: 0.6,
+                shootCooldownMs: 1000,
+                affectedByGravity: true,
+                projectileSpeed: 400,
+                projectileCount: 1,
+                knockback: 300,
+                leftDist: 550,
+            },
+            {
+                x: 2050,
+                y: 800,
+                type: "turret",
+                health: 1,
+                accuracy: 1,
+                shootCooldownMs: 200,
+                angleDeg: 100,
+            },
+            {
+                x: 2300,
+                y: 275,
+                type: "turret",
+                health: 3,
+                accuracy: 0.95,
+                shootCooldownMs: 200,
+                angleDeg: 180,
+            },
+            {
+                x: 2435,
+                y: 550,
+                type: "default",
+                health: 3,
+                accuracy: 0.6,
+                affectedByGravity: false,
+                projectileCount: 3,
+                leftDist: 55,
+            },
+        ],
+        goal: {
+            x: 2550,
+            y: 460
+        },
+        weapon: "default",
+    },
+    {
+        name: "Malleable",
+        worldBounds: {
+            width: 1280,
+            height: 720
+        },
+        playerSpawn: {
+            x: 640,
+            y: 650
+        },
+        timeLimitMs: 50000,
+        platforms: [
+            { x1: 0, y1: 670, x2: 1280, y2: 720, type: "normal" },
+            { x1: 40, y1: 60, x2: 140, y2: 90, type: "breakable", health: 6 },
+            { x1: 140, y1: 60, x2: 240, y2: 90, type: "breakable", health: 6 },
+            { x1: 240, y1: 60, x2: 340, y2: 90, type: "breakable", health: 6 },
+            { x1: 340, y1: 60, x2: 440, y2: 90, type: "breakable", health: 6 },
+            { x1: 440, y1: 60, x2: 540, y2: 90, type: "breakable", health: 6 },
+            { x1: 540, y1: 60, x2: 640, y2: 90, type: "breakable", health: 6 },
+            { x1: 640, y1: 60, x2: 740, y2: 90, type: "breakable", health: 6 },
+            { x1: 740, y1: 60, x2: 840, y2: 90, type: "breakable", health: 6 },
+            { x1: 840, y1: 60, x2: 940, y2: 90, type: "breakable", health: 6 },
+            { x1: 940, y1: 60, x2: 1040, y2: 90, type: "breakable", health: 6 },
+            { x1: 1040, y1: 60, x2: 1140, y2: 90, type: "breakable", health: 6 },
+            { x1: 1140, y1: 60, x2: 1240, y2: 90, type: "breakable", health: 6 },
+        ],
+        texts: [
+            { x: 640, y: 420, text: "Some Levels Utilize Different Weapons" },
+        ],
+        enemies: [
+            {
+                x: 40,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 140,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 240,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 340,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 440,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 540,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 640,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 740,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 840,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 940,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 1040,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 1140,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+            {
+                x: 1240,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+            },
+        ],
+        goal: {
+            x: 640,
+            y: 640
+        },
+        weapon: "beam",
+    },
+    {
+        name: "Concomitant",
+        worldBounds: {
+            width: 1280,
+            height: 1060
+        },
+        playerSpawn: {
+            x: 640,
+            y: 990
+        },
+        timeLimitMs: 60000,
+        platforms: [
+            { x1: 100, y1: 0, x2: 1180, y2: 50, type: "normal" },
+            { x1: 100, y1: 50, x2: 490, y2: 100, type: "normal" },
+            { x1: 790, y1: 50, x2: 1180, y2: 100, type: "normal" },
+            { x1: 490, y1: 50, x2: 640, y2: 100, type: "redirect", direction: 90 },
+            { x1: 640, y1: 50, x2: 790, y2: 100, type: "redirect", direction: 90 },
+            { x1: 0, y1: 0, x2: 100, y2: 1060, type: "normal" },
+            { x1: 1180, y1: 0, x2: 1280, y2: 1060, type: "normal" },
+
+            { x1: 490, y1: 180, x2: 790, y2: 210, type: "oneway" },
+            { x1: 100, y1: 180, x2: 490, y2: 720, type: "normal" },
+            { x1: 790, y1: 180, x2: 1180, y2: 430, type: "normal" },
+
+            { x1: 490, y1: 470, x2: 790, y2: 500, type: "oneway" },
+            { x1: 790, y1: 470, x2: 1180, y2: 1010, type: "normal" },
+
+            { x1: 490, y1: 760, x2: 790, y2: 790, type: "oneway" },
+            { x1: 100, y1: 760, x2: 490, y2: 1010, type: "normal" },
+
+            { x1: 100, y1: 1010, x2: 1180, y2: 1060, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 220,
+                y: 160,
+                type: "turret",
+                shootCooldownMs: 1000,
+                health: 3,
+                affectedByGravity: true,
+                knockback: 400,
+                angleDeg: 353,
+            },
+            {
+                x: 1060,
+                y: 160,
+                type: "turret",
+                shootCooldownMs: 1000,
+                initialCooldownMs: 500,
+                health: 3,
+                affectedByGravity: true,
+                knockback: 400,
+                angleDeg: 187,
+            },
+
+            {
+                x: 150,
+                y: 740,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 1,
+                angleDeg: 0,
+            },
+            {
+                x: 250,
+                y: 740,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 1,
+                angleDeg: 0,
+            },
+            {
+                x: 350,
+                y: 740,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 1,
+                angleDeg: 0,
+            },
+            {
+                x: 450,
+                y: 740,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 2,
+                angleDeg: 0,
+            },
+
+            {
+                x: 1130,
+                y: 450,
+                type: "turret",
+                shootCooldownMs: 1800,
+                health: 1,
+                angleDeg: 180,
+            },
+            {
+                x: 1030,
+                y: 450,
+                type: "turret",
+                shootCooldownMs: 1800,
+                health: 1,
+                angleDeg: 180,
+            },
+            {
+                x: 930,
+                y: 450,
+                type: "turret",
+                shootCooldownMs: 1800,
+                health: 1,
+                angleDeg: 180,
+            },
+            {
+                x: 830,
+                y: 450,
+                type: "turret",
+                shootCooldownMs: 1800,
+                health: 2,
+                angleDeg: 180,
+            },
+        ],
+        goal: {
+            x: 640,
+            y: 150
+        },
+        weapon: "beam",
+    },
+    {
+        name: "Oblique",
+        worldBounds: {
+            width: 1280,
+            height: 720
+        },
+        playerSpawn: {
+            x: 580,
+            y: 670
+        },
+        timeLimitMs: 90000,
+        platforms: [
+            { x1: 0, y1: 0, x2: 1280, y2: 30, type: "bounceable" },
+            { x1: 0, y1: 690, x2: 1280, y2: 720, type: "bounceable" },
+            { x1: 0, y1: 30, x2: 30, y2: 690, type: "bounceable" },
+
+            { x1: 1160, y1: 30, x2: 1190, y2: 130, type: "bulletPassthrough" },
+            { x1: 1160, y1: 130, x2: 1190, y2: 590, type: "enemyPassthrough" },
+            { x1: 1160, y1: 590, x2: 1190, y2: 690, type: "bulletPassthrough" },
+
+            { x1: 200, y1: 230, x2: 400, y2: 260, type: "oneway" },
+            { x1: 200, y1: 520, x2: 400, y2: 550, type: "oneway" },
+            { x1: 760, y1: 230, x2: 960, y2: 260, type: "oneway" },
+            { x1: 760, y1: 520, x2: 960, y2: 550, type: "oneway" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 1260,
+                y: 180,
+                type: "default",
+                shootCooldownMs: 5000,
+                health: 5,
+                accuracy: 0.2,
+                affectedByGravity: false,
+                projectileCount: 5,
+            },
+            {
+                x: 1260,
+                y: 540,
+                type: "default",
+                shootCooldownMs: 5000,
+                health: 5,
+                accuracy: 0.2,
+                affectedByGravity: false,
+                projectileCount: 5,
+            },
+        ],
+        goal: {
+            x: 580,
+            y: 660
+        },
+        weapon: "default",
+    },
+    {
+        name: "Synthesis",
+        worldBounds: {
+            width: 4830,
+            height: 750
+        },
+        playerSpawn: {
+            x: 50,
+            y: 550
+        },
+        timeLimitMs: 120000,
+        platforms: [
+            { x1: 0, y1: 600, x2: 870, y2: 750, type: "normal" },
+
+            { x1: 610, y1: 0, x2: 640, y2: 470, type: "normal" },
+            { x1: 640, y1: 440, x2: 840, y2: 470, type: "oneway" },
+            { x1: 840, y1: 440, x2: 870, y2: 600, type: "normal" },
+
+            { x1: 1170, y1: 380, x2: 1370, y2: 410, type: "oneway" },
+            { x1: 1770, y1: 380, x2: 1970, y2: 410, type: "oneway" },
+            { x1: 870, y1: 700, x2: 2340, y2: 750, type: "normal" },
+
+            { x1: 2270, y1: 320, x2: 2300, y2: 630, type: "normal" },
+            { x1: 2270, y1: 630, x2: 2340, y2: 700, type: "redirect", direction: 180 },
+            { x1: 2300, y1: 600, x2: 2340, y2: 630, type: "enemyPassthrough" },
+            { x1: 2300, y1: 320, x2: 2500, y2: 350, type: "oneway" },
+            { x1: 2500, y1: 0, x2: 2530, y2: 500, type: "normal" },
+            { x1: 2340, y1: 600, x2: 2970, y2: 750, type: "normal" },
+            { x1: 2500, y1: 500, x2: 2530, y2: 600, type: "breakable", health: 3 },
+            { x1: 2530, y1: 240, x2: 2810, y2: 270, type: "breakable", health: 2 },
+            { x1: 2530, y1: 60, x2: 2665, y2: 90, type: "breakable", health: 5 },
+            { x1: 2665, y1: 60, x2: 2805, y2: 90, type: "breakable", health: 5 },
+            { x1: 2805, y1: 60, x2: 2940, y2: 90, type: "breakable", health: 5 },
+            { x1: 2940, y1: 0, x2: 2970, y2: 140, type: "normal" },
+            { x1: 2940, y1: 140, x2: 2970, y2: 240, type: "breakable", health: 2 },
+            { x1: 2940, y1: 240, x2: 2970, y2: 600, type: "normal" },
+
+            { x1: 2970, y1: 395, x2: 3270, y2: 425, type: "oneway" },
+            { x1: 2970, y1: 700, x2: 3270, y2: 750, type: "normal" },
+            { x1: 3270, y1: 395, x2: 3600, y2: 750, type: "normal" },
+            { x1: 3560, y1: 355, x2: 3600, y2: 395, type: "breakable", health: 1 },
+            { x1: 3270, y1: 0, x2: 3600, y2: 355, type: "normal" },
+            { x1: 2970, y1: 0, x2: 3270, y2: 50, type: "normal" },
+
+            { x1: 3600, y1: 0, x2: 4800, y2: 70, type: "normal" },
+            { x1: 3600, y1: 680, x2: 4800, y2: 750, type: "normal" },
+            { x1: 3600, y1: 70, x2: 4800, y2: 100, type: "bounceable" },
+            { x1: 3600, y1: 650, x2: 4800, y2: 680, type: "bounceable" },
+
+            { x1: 3690, y1: 180, x2: 3720, y2: 355, type: "enemyPassthrough" },
+            { x1: 3690, y1: 395, x2: 3720, y2: 570, type: "enemyPassthrough" },
+            { x1: 3600, y1: 325, x2: 3720, y2: 355, type: "enemyPassthrough" },
+            { x1: 3600, y1: 395, x2: 3720, y2: 425, type: "enemyPassthrough" },
+            { x1: 3690, y1: 100, x2: 3720, y2: 180, type: "bulletPassthrough" },
+            { x1: 3690, y1: 570, x2: 3720, y2: 650, type: "bulletPassthrough" },
+
+            { x1: 3920, y1: 375, x2: 4120, y2: 405, type: "oneway" },
+            { x1: 4370, y1: 375, x2: 4570, y2: 405, type: "oneway" },
+
+            { x1: 4770, y1: 100, x2: 4800, y2: 650, type: "bounceable" },
+            { x1: 4800, y1: 0, x2: 4830, y2: 750, type: "normal" },
+        ],
+        texts: [
+            { x: 250, y: 240, text: "Focus:", fontSize: "96px", color: "#7abfff" },
+        ],
+        enemies: [
+            {
+                x: 1270,
+                y: 680,
+                type: "default",
+                health: 3,
+                affectedByGravity: false,
+                leftDist: 630,
+                rightDist: 1230,
+            },
+            {
+                x: 1870,
+                y: 680,
+                type: "default",
+                health: 3,
+                affectedByGravity: false,
+                leftDist: 1230,
+                rightDist: 630,
+            },
+
+            {
+                x: 2320,
+                y: 580,
+                type: "turret",
+                health: 1,
+                affectedByGravity: false,
+                angleDeg: 90,
+            },
+
+            {
+                x: 2555,
+                y: 300,
+                type: "default",
+                health: 3,
+                accuracy: 0.6,
+                affectedByGravity: false,
+                projectileCount: 3,
+                leftDist: 55,
+            },
+
+            {
+                x: 2735,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+                leftDist: 465,
+            },
+            {
+                x: 2605,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+                leftDist: 235,
+            },
+            {
+                x: 2865,
+                y: 30,
+                type: "default",
+                health: 2,
+                affectedByGravity: false,
+                leftDist: 495,
+            },
+
+            {
+                x: 3510,
+                y: 375,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 1,
+                angleDeg: 180,
+            },
+            {
+                x: 3410,
+                y: 375,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 1,
+                angleDeg: 180,
+            },
+            {
+                x: 3310,
+                y: 375,
+                type: "turret",
+                shootCooldownMs: 2000,
+                health: 1,
+                angleDeg: 180,
+            },
+
+            {
+                x: 3620,
+                y: 230,
+                type: "default",
+                shootCooldownMs: 5500,
+                health: 3,
+                accuracy: 0.2,
+                affectedByGravity: false,
+                projectileCount: 3,
+                leftDist: 20,
+            },
+            {
+                x: 3620,
+                y: 520,
+                type: "default",
+                shootCooldownMs: 5500,
+                health: 3,
+                accuracy: 0.2,
+                affectedByGravity: false,
+                projectileCount: 3,
+                leftDist: 20,
+            },
+        ],
+        goal: {
+            x: 4245,
+            y: 620
+        },
+        weapon: "default",
+    },
+    {
+        name: "Acerbic",
+        worldBounds: {
+            width: 30000,
+            height: 720
+        },
+        playerSpawn: {
+            x: 200,
+            y: 520
+        },
+        timeLimitMs: 60000,
+        platforms: [
+            { x1: 0, y1: 710, x2: 50000, y2: 720, type: "death" },
+
+            { x1: 100, y1: 540, x2: 300, y2: 570, type: "normal" },
+
+            { x1: 600, y1: 450, x2: 800, y2: 480, type: "normal" },
+
+            { x1: 960, y1: 0, x2: 990, y2: 70, type: "enemyPassthrough" },
+            { x1: 990, y1: 40, x2: 1030, y2: 70, type: "enemyPassthrough" },
+
+            { x1: 1100, y1: 460, x2: 1300, y2: 470, type: "death" },
+            { x1: 1100, y1: 470, x2: 1300, y2: 500, type: "normal" },
+
+            { x1: 1500, y1: 500, x2: 1700, y2: 530, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 1015,
+                y: 20,
+                shootCooldownMs: 1000,
+                health: 1,
+                accuracy: 0.6,
+                type: "default",
+                affectedByGravity: false,
+                projectileCount: 5,
+            },
+            {
+                x: 1900,
+                y: 390,
+                health: 3,
+                accuracy: 0.9,
+                type: "turret",
+                affectedByGravity: false,
+                angleDeg: 180,
+            },
+        ],
+        goal: {
+            x: 200,
+            y: 510
+        },
+        weapon: "default",
+    },
+    {
+        name: "Transmute",
+        worldBounds: {
+            width: 1280,
+            height: 1400
+        },
+        playerSpawn: {
+            x: 145,
+            y: 1210
+        },
+        timeLimitMs: 120000,
+        platforms: [
+            { x1: 0, y1: 0, x2: 800, y2: 50, type: "normal" },
+            { x1: 0, y1: 50, x2: 50, y2: 1400, type: "normal" },
+            { x1: 1100, y1: 0, x2: 1280, y2: 650, type: "normal" },
+            { x1: 100, y1: 50, x2: 800, y2: 170, type: "normal" },
+            { x1: 50, y1: 470, x2: 350, y2: 520, type: "normal" },
+            { x1: 50, y1: 420, x2: 100, y2: 470, type: "redirect", direction: 0 },
+            { x1: 300, y1: 420, x2: 350, y2: 470, type: "redirect", direction: 270 },
+            { x1: 300, y1: 170, x2: 350, y2: 220, type: "redirect", direction: 180 },
+
+            { x1: 50, y1: 520, x2: 450, y2: 730, type: "normal" },
+            { x1: 800, y1: 0, x2: 900, y2: 290, type: "normal" },
+            { x1: 900, y1: 0, x2: 1100, y2: 410, type: "normal" },
+            { x1: 1020, y1: 410, x2: 1100, y2: 490, type: "redirect", direction: 180 },
+            { x1: 900, y1: 600, x2: 1100, y2: 650, type: "normal" },
+            { x1: 1230, y1: 650, x2: 1280, y2: 1400, type: "normal" },
+            { x1: 50, y1: 730, x2: 280, y2: 800, type: "normal" },
+
+            { x1: 450, y1: 650, x2: 480, y2: 680, type: "redirect", direction: 0 },
+            { x1: 1200, y1: 650, x2: 1230, y2: 680, type: "redirect", direction: 90 },
+
+            { x1: 1180, y1: 935, x2: 1230, y2: 985, type: "redirect", direction: 180 },
+            { x1: 720, y1: 1000, x2: 920, y2: 1030, type: "oneway" },
+
+            { x1: 50, y1: 1350, x2: 1230, y2: 1400, type: "normal" },
+            { x1: 50, y1: 1280, x2: 410, y2: 1350, type: "normal" },
+            { x1: 50, y1: 1230, x2: 240, y2: 1280, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 75,
+                y: 70,
+                type: "turret",
+                health: 1,
+                accuracy: 1,
+                shootCooldownMs: 350,
+                angleDeg: 90,
+                affectedByGravity: false,
+            },
+            {
+                x: 1080,
+                y: 580,
+                type: "turret",
+                health: 3,
+                accuracy: 1,
+                shootCooldownMs: 200,
+                angleDeg: 270,
+                affectedByGravity: false,
+            },
+            {
+                x: 465,
+                y: 625,
+                type: "default",
+                health: 3,
+                accuracy: 0.2,
+                affectedByGravity: false,
+                projectileSpeed: 500,
+                projectileCount: 2,
+            },
+            {
+                x: 465,
+                y: 1330,
+                type: "turret",
+                health: 3,
+                accuracy: 1,
+                shootCooldownMs: 200,
+                angleDeg: 270,
+                affectedByGravity: false,
+            },
+            {
+                x: 365,
+                y: 750,
+                type: "turret",
+                health: 3,
+                angleDeg: 90,
+                affectedByGravity: false,
+            },
+            {
+                x: 65,
+                y: 820,
+                type: "turret",
+                health: 3,
+                angleDeg: 7,
+                affectedByGravity: false,
+            },
+            {
+                x: 1215,
+                y: 1255,
+                type: "turret",
+                health: 3,
+                angleDeg: 180,
+                affectedByGravity: false,
+            },
+            {
+                x: 820,
+                y: 980,
+                type: "default",
+                health: 3,
+                accuracy: 0.2,
+                affectedByGravity: true,
+                projectileSpeed: 500,
+                projectileCount: 2,
+                knockback: 300,
+            },
+        ],
+        goal: {
+            x: 200,
+            y: 440
+        },
+        weapon: "default",
+    },
+    {
+        name: "Viscous",
+        worldBounds: {
+            width: 1280,
+            height: 1600
+        },
+        playerSpawn: {
+            x: 640,
+            y: 120
+        },
+        timeLimitMs: 40000,
+        platforms: [
+            { x1: 0, y1: 0, x2: 1280, y2: 50, type: "normal" },
+            { x1: 0, y1: 50, x2: 50, y2: 1050, type: "normal" },
+            { x1: 1230, y1: 50, x2: 1280, y2: 1050, type: "normal" },
+            { x1: 0, y1: 1050, x2: 1280, y2: 1100, type: "normal" },
+
+            { x1: 50, y1: 150, x2: 450, y2: 180, type: "normal" },
+            { x1: 450, y1: 150, x2: 830, y2: 180, type: "oneway" },
+            { x1: 830, y1: 150, x2: 1230, y2: 180, type: "normal" },
+
+            { x1: 50, y1: 200, x2: 1230, y2: 230, type: "oneway" },
+            { x1: 50, y1: 250, x2: 1230, y2: 280, type: "oneway" },
+            { x1: 50, y1: 300, x2: 1230, y2: 330, type: "oneway" },
+            { x1: 50, y1: 350, x2: 1230, y2: 380, type: "oneway" },
+            { x1: 50, y1: 400, x2: 1230, y2: 430, type: "oneway" },
+            { x1: 50, y1: 450, x2: 1230, y2: 480, type: "oneway" },
+            { x1: 50, y1: 500, x2: 1230, y2: 530, type: "oneway" },
+            { x1: 50, y1: 550, x2: 1230, y2: 580, type: "oneway" },
+
+            { x1: 50, y1: 600, x2: 450, y2: 630, type: "normal" },
+            { x1: 450, y1: 600, x2: 830, y2: 630, type: "oneway" },
+            { x1: 830, y1: 600, x2: 1230, y2: 630, type: "normal" },
+
+            { x1: 50, y1: 650, x2: 1230, y2: 680, type: "oneway" },
+            { x1: 50, y1: 700, x2: 1230, y2: 730, type: "oneway" },
+            { x1: 50, y1: 750, x2: 1230, y2: 780, type: "oneway" },
+            { x1: 50, y1: 800, x2: 1230, y2: 830, type: "oneway" },
+            { x1: 50, y1: 850, x2: 1230, y2: 880, type: "oneway" },
+            { x1: 50, y1: 900, x2: 1230, y2: 930, type: "oneway" },
+            { x1: 50, y1: 950, x2: 1230, y2: 980, type: "oneway" },
+            { x1: 50, y1: 1000, x2: 1230, y2: 1030, type: "oneway" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 100,
+                y: 320,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+            {
+                x: 100,
+                y: 460,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+            {
+                x: 1180,
+                y: 320,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+            {
+                x: 1180,
+                y: 460,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+
+            {
+                x: 100,
+                y: 770,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+            {
+                x: 100,
+                y: 910,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+            {
+                x: 1180,
+                y: 770,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+            {
+                x: 1180,
+                y: 910,
+                accuracy: 0.5,
+                type: "default",
+                shootCooldownMs: 3000,
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+        ],
+        goal: {
+            x: 640,
+            y: 120
+        },
+        weapon: "default",
+    },
+    {
+        name: "Oscillate",
+        worldBounds: {
+            width: 1800,
+            height: 720
+        },
+        playerSpawn: {
+            x: 500,
+            y: 340
+        },
+        timeLimitMs: 60000,
+        platforms: [
+            { x1: 0, y1: 0, x2: 1800, y2: 30, type: "bounceable" },
+            { x1: 0, y1: 690, x2: 1800, y2: 720, type: "bounceable" },
+
+            { x1: 1200, y1: 360, x2: 1400, y2: 390, type: "oneway" },
+            { x1: 400, y1: 360, x2: 600, y2: 390, type: "oneway" },
+
+            { x1: 885, y1: 30, x2: 915, y2: 130, type: "bounceable" },
+            { x1: 885, y1: 590, x2: 915, y2: 690, type: "bounceable" },
+            { x1: 0, y1: 680, x2: 885, y2: 690, type: "death" },
+            { x1: 885, y1: 580, x2: 915, y2: 590, type: "death" },
+            { x1: 915, y1: 680, x2: 1800, y2: 690, type: "death" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 20,
+                y: 360,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 20,
+                y: 280,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 20,
+                y: 440,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 20,
+                y: 200,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 20,
+                y: 520,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 20,
+                y: 120,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 20,
+                y: 600,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+
+            {
+                x: 1780,
+                y: 360,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 1780,
+                y: 280,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 1780,
+                y: 440,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 1780,
+                y: 200,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 1780,
+                y: 520,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 1780,
+                y: 120,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+            {
+                x: 1780,
+                y: 600,
+                shootCooldownMs: 3500,
+                health: 1,
+                accuracy: 0.2,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 600,
+            },
+        ],
+        goal: {
+            x: 1300,
+            y: 330
+        },
+        weapon: "default",
+    },
+    {
+        name: "Destitute",
+        worldBounds: {
+            width: 1200,
+            height: 1200
+        },
+        playerSpawn: {
+            x: 600,
+            y: 600
+        },
+        timeLimitMs: 180000,
+        platforms: [
+            { x1: 0, y1: 0, x2: 1200, y2: 50, type: "normal" },
+            { x1: 0, y1: 50, x2: 50, y2: 1150, type: "normal" },
+            { x1: 1150, y1: 50, x2: 1200, y2: 1150, type: "normal" },
+            { x1: 0, y1: 1150, x2: 1200, y2: 1200, type: "normal" },
+
+            // Bottom Left
+            { x1: 540, y1: 630, x2: 630, y2: 660, type: "breakable", health: 1 },
+            { x1: 540, y1: 660, x2: 570, y2: 750, type: "breakable", health: 5 },
+            { x1: 300, y1: 630, x2: 540, y2: 660, type: "breakable", health: 5 },
+            { x1: 300, y1: 750, x2: 570, y2: 780, type: "breakable", health: 5 },
+            { x1: 540, y1: 780, x2: 570, y2: 900, type: "breakable", health: 5 },
+            { x1: 420, y1: 780, x2: 450, y2: 900, type: "breakable", health: 5 },
+            { x1: 420, y1: 660, x2: 450, y2: 750, type: "breakable", health: 5 },
+            { x1: 270, y1: 300, x2: 300, y2: 930, type: "breakable", health: 6 },
+            { x1: 345, y1: 930, x2: 375, y2: 1150, type: "breakable", health: 5 },
+            { x1: 50, y1: 825, x2: 270, y2: 855, type: "breakable", health: 5 },
+
+            { x1: 50, y1: 1050, x2: 100, y2: 1100, type: "breakable", health: 10 },
+            { x1: 100, y1: 1050, x2: 150, y2: 1100, type: "breakable", health: 10 },
+            { x1: 100, y1: 1100, x2: 150, y2: 1150, type: "breakable", health: 10 },
+
+            // Bottom Right
+            { x1: 630, y1: 570, x2: 660, y2: 660, type: "breakable", health: 1 },
+            { x1: 660, y1: 630, x2: 750, y2: 660, type: "breakable", health: 5 },
+            { x1: 630, y1: 660, x2: 660, y2: 900, type: "breakable", health: 5 },
+            { x1: 750, y1: 630, x2: 780, y2: 900, type: "breakable", health: 5 },
+            { x1: 780, y1: 630, x2: 900, y2: 660, type: "breakable", health: 5 },
+            { x1: 780, y1: 750, x2: 900, y2: 780, type: "breakable", health: 5 },
+            { x1: 660, y1: 750, x2: 750, y2: 780, type: "breakable", health: 5 },
+            { x1: 300, y1: 900, x2: 930, y2: 930, type: "breakable", health: 6 },
+            { x1: 825, y1: 930, x2: 855, y2: 1150, type: "breakable", health: 5 },
+            { x1: 930, y1: 825, x2: 1150, y2: 855, type: "breakable", health: 5 },
+
+            { x1: 1050, y1: 1100, x2: 1100, y2: 1150, type: "breakable", health: 10 },
+            { x1: 1050, y1: 1050, x2: 1100, y2: 1100, type: "breakable", health: 10 },
+            { x1: 1100, y1: 1050, x2: 1150, y2: 1100, type: "breakable", health: 10 },
+
+            // Top Left
+            { x1: 540, y1: 540, x2: 570, y2: 630, type: "breakable", health: 1 },
+            { x1: 450, y1: 540, x2: 540, y2: 570, type: "breakable", health: 5 },
+            { x1: 540, y1: 300, x2: 570, y2: 540, type: "breakable", health: 5 },
+            { x1: 420, y1: 300, x2: 450, y2: 570, type: "breakable", health: 5 },
+            { x1: 300, y1: 540, x2: 420, y2: 570, type: "breakable", health: 5 },
+            { x1: 300, y1: 420, x2: 420, y2: 450, type: "breakable", health: 5 },
+            { x1: 450, y1: 420, x2: 540, y2: 450, type: "breakable", health: 5 },
+            { x1: 270, y1: 270, x2: 900, y2: 300, type: "breakable", health: 6 },
+            { x1: 345, y1: 50, x2: 375, y2: 270, type: "breakable", health: 5 },
+            { x1: 50, y1: 345, x2: 270, y2: 375, type: "breakable", health: 5 },
+
+            { x1: 50, y1: 100, x2: 100, y2: 150, type: "breakable", health: 10 },
+            { x1: 100, y1: 50, x2: 150, y2: 100, type: "breakable", health: 10 },
+            { x1: 100, y1: 100, x2: 150, y2: 150, type: "breakable", health: 10 },
+
+            // Top Right
+            { x1: 570, y1: 540, x2: 660, y2: 570, type: "breakable", health: 1 },
+            { x1: 630, y1: 450, x2: 660, y2: 540, type: "breakable", health: 5 },
+            { x1: 660, y1: 540, x2: 900, y2: 570, type: "breakable", health: 5 },
+            { x1: 630, y1: 420, x2: 900, y2: 450, type: "breakable", health: 5 },
+            { x1: 630, y1: 300, x2: 660, y2: 420, type: "breakable", health: 5 },
+            { x1: 750, y1: 300, x2: 780, y2: 420, type: "breakable", health: 5 },
+            { x1: 750, y1: 450, x2: 780, y2: 540, type: "breakable", health: 5 },
+            { x1: 900, y1: 270, x2: 930, y2: 900, type: "breakable", health: 6 },
+            { x1: 825, y1: 50, x2: 855, y2: 270, type: "breakable", health: 5 },
+            { x1: 930, y1: 345, x2: 1150, y2: 375, type: "breakable", health: 5 },
+
+            { x1: 1050, y1: 100, x2: 1100, y2: 150, type: "breakable", health: 10 },
+            { x1: 1050, y1: 50, x2: 1100, y2: 100, type: "breakable", health: 10 },
+            { x1: 1100, y1: 100, x2: 1150, y2: 150, type: "breakable", health: 10 },
+        ],
+        texts: [
+        ],
+        enemies: [
+            // Bottom Left
+            {
+                x: 495,
+                y: 705,
+                type: "default",
+                health: 1,
+                knockback: 300,
+            },
+            {
+                x: 360,
+                y: 840,
+                type: "default",
+                initialCooldownMs: 4000,
+                health: 2,
+                projectileCount: 3,
+                knockback: 300,
+            },
+            {
+                x: 75,
+                y: 1125,
+                type: "default",
+                health: 3,
+                projectileCount: 3,
+                knockback: 300,
+            },
+
+            // Bottom Right
+            {
+                x: 705,
+                y: 705,
+                type: "default",
+                health: 1,
+                knockback: 300,
+            },
+            {
+                x: 840,
+                y: 840,
+                type: "default",
+                initialCooldownMs: 4000,
+                health: 2,
+                projectileCount: 3,
+                knockback: 300,
+            },
+            {
+                x: 1125,
+                y: 1125,
+                type: "default",
+                health: 3,
+                projectileCount: 3,
+                knockback: 300,
+            },
+
+            // Top Left
+            {
+                x: 495,
+                y: 495,
+                type: "default",
+                health: 1,
+                knockback: 300,
+            },
+            {
+                x: 360,
+                y: 360,
+                type: "default",
+                initialCooldownMs: 4000,
+                health: 2,
+                projectileCount: 3,
+                knockback: 300,
+            },
+            {
+                x: 75,
+                y: 75,
+                type: "default",
+                health: 3,
+                projectileCount: 3,
+                knockback: 300,
+            },
+
+            // Top Right
+            {
+                x: 705,
+                y: 495,
+                type: "default",
+                health: 1,
+                knockback: 300,
+            },
+            {
+                x: 840,
+                y: 360,
+                type: "default",
+                initialCooldownMs: 4000,
+                health: 2,
+                projectileCount: 3,
+                knockback: 300,
+            },
+            {
+                x: 1125,
+                y: 75,
+                type: "default",
+                health: 3,
+                projectileCount: 3,
+                knockback: 300,
+            },
+        ],
+        goal: {
+            x: 600,
+            y: 600
+        },
+        weapon: "blaster",
+    },
+    // 12 - big level again
+];
