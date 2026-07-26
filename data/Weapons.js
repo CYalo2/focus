@@ -1,3 +1,5 @@
+import { WEAPON_MAX_INACCURACY_RAD } from "./Constants.js";
+
 // CHARGE: hold click to charge, release to fire; movement/jump multipliers apply
 // while charging. Requires chargeTimeMs.
 // COOLDOWN: fires immediately on click, then can't fire again until cooldownMs
@@ -8,16 +10,33 @@ export const WEAPON_FIRE_MODE = {
     COOLDOWN: "cooldown",
 };
 
+// Applies this weapon's accuracy spread to a base aim angle -- same triangular
+// distribution Enemy.shoot() uses (Math.random() - Math.random(), weighted toward 0
+// rather than a flat edge-to-edge spread), just scaled by WEAPON_MAX_INACCURACY_RAD
+// instead of the enemy constant, so player weapons read as noticeably more precise
+// than enemy fire at a comparable accuracy value. accuracy is 0..1 and defaults to 1
+// (perfectly accurate, zero spread) when a weapon doesn't define one, so existing
+// weapons are unaffected unless they opt in. Used by both Player.fireWeapon (for
+// travelling projectiles) and GameScene.fireBeamWeapon (for the hitscan beam), so a
+// weapon's accuracy applies the same way regardless of which of the two it uses.
+export function applyWeaponSpread(weapon, baseAngle) {
+    const accuracy = weapon.accuracy !== undefined ? weapon.accuracy : 1;
+    const spread = (1 - accuracy) * WEAPON_MAX_INACCURACY_RAD;
+    if (!spread) return baseAngle;
+    return baseAngle + (Math.random() - Math.random()) * spread;
+}
+
 export const WEAPONS = {
     default: {
         name: "Default",
-        fireMode: WEAPON_FIRE_MODE.CHARGE,
-        chargeTimeMs: 300,
-        moveSpeedMultiplier: 0.5,
-        jumpMultiplier: 0.5,
-        projectileSpeed: 900,
-        recoil: 300,
-        damage: 1,
+        fireMode: WEAPON_FIRE_MODE.COOLDOWN,
+        cooldownMs: 150,
+        moveSpeedMultiplier: 0.8,
+        jumpMultiplier: 0.7,
+        projectileSpeed: 800,
+        recoil: 0,
+        damage: 0.3,
+        accuracy: 0.7,
     },
 
     // Same stats as `default`, but isBeam: true replaces the travelling projectile
@@ -32,9 +51,9 @@ export const WEAPONS = {
         name: "Beam",
         fireMode: WEAPON_FIRE_MODE.CHARGE,
         chargeTimeMs: 500,
-        moveSpeedMultiplier: 0.5,
-        jumpMultiplier: 0.5,
-        recoil: 0,
+        moveSpeedMultiplier: 0.8,
+        jumpMultiplier: 0.8,
+        recoil: 300,
         damage: 1,
         isBeam: true,
         beamWidth: 6,

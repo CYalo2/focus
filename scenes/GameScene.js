@@ -1,7 +1,7 @@
 import { BULLET_TIME_MULTIPLIER, DEFAULT_WORLD_BOUNDS, BULLET_OFFSCREEN_MARGIN, HIT_FLASH_BRIGHTEN_AMOUNT, DEPTH, BULLET_PLAYER_TINT, BULLET_ENEMY_TINT } from "../data/Constants.js";
 import { lightenColor } from "../data/ColorUtils.js";
 import { LEVELS } from "../data/Levels.js";
-import { WEAPONS } from "../data/Weapons.js";
+import { WEAPONS, applyWeaponSpread } from "../data/Weapons.js";
 import { Player } from "../entity/Player.js";
 import { Enemy } from "../entity/Enemy.js";
 import { createPlatforms } from "../entity/Platform.js";
@@ -201,7 +201,7 @@ export class GameScene extends Phaser.Scene {
 
     // --- input ---
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,SHIFT');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,SHIFT,Q');
     this.input.mouse.disableContextMenu();
 
     // --- HUD (fixed to camera) ---
@@ -349,7 +349,8 @@ export class GameScene extends Phaser.Scene {
   // platform and every enemy it pierces through along the way, then draw the beam.
   fireBeamWeapon(player, pointer) {
     const weapon = player.weapon;
-    const angle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
+    const aimAngle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
+    const angle = applyWeaponSpread(weapon, aimAngle);
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
     const maxRange = weapon.beamRange || Math.hypot(this.worldBounds.width, this.worldBounds.height);

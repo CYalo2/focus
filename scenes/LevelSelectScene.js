@@ -23,6 +23,12 @@ export class LevelSelectScene extends Phaser.Scene {
         this.totalPages = Math.max(1, Math.ceil(LEVELS.length / PAGE_SIZE));
         this.modalContainer = null;
 
+        // Set once the player uses the arrows -- refreshProgress() only jumps to the
+        // "furthest unlocked level" page while this is still false, so it doesn't yank
+        // the player back to that page if they've already navigated away from it
+        // (e.g. paged forward while the initial completion data was still loading).
+        this.hasNavigated = false;
+
         // Unlock state per level, indexed the same as LEVELS. Starts all-locked
         // (except level 0, handled by isLevelUnlocked) so buildPage() has something
         // sane to render immediately; refreshProgress() fills in the real values
@@ -105,6 +111,7 @@ export class LevelSelectScene extends Phaser.Scene {
         const newPage = this.page + delta;
         if (newPage < 0 || newPage >= this.totalPages) return;
         this.page = newPage;
+        this.hasNavigated = true;
         this.buildPage();
     }
 
@@ -128,7 +135,25 @@ export class LevelSelectScene extends Phaser.Scene {
         // Scene may have been left while this was loading.
         if (!this.scene.isActive()) return;
 
+        // Land on the page holding the furthest unlocked level (e.g. beat 6 levels ->
+        // land on level 7's page) instead of always starting on page 0 -- but only if
+        // the player hasn't already paged somewhere themselves in the meantime.
+        if (!this.hasNavigated) {
+            this.page = Math.floor(this.furthestUnlockedLevelIndex() / PAGE_SIZE);
+        }
+
         this.buildPage();
+    }
+
+    // Levels unlock sequentially from level 0, so the furthest unlocked level is just
+    // the last one in that unbroken unlocked run from the start.
+    furthestUnlockedLevelIndex() {
+        let furthest = 0;
+        for (let i = 0; i < LEVELS.length; i++) {
+            if (!this.isLevelUnlocked(i)) break;
+            furthest = i;
+        }
+        return furthest;
     }
 
     // Level 0 is always playable; every other level requires the one immediately

@@ -1,5 +1,5 @@
 import { PLAYER_STATS, GRAVITY, DASH, CHARGING_TINT, CHARGE_READY_TINT, DEPTH } from "../data/Constants.js";
-import { WEAPON_FIRE_MODE } from "../data/Weapons.js";
+import { WEAPON_FIRE_MODE, applyWeaponSpread } from "../data/Weapons.js";
 import { createBullet } from "./Bullet.js";
 import { spawnDashParticles } from "../fx/Particles.js";
 
@@ -51,7 +51,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return;
     }
 
-    const angle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
+    const aimAngle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
+    const angle = applyWeaponSpread(this.weapon, aimAngle);
     const bullet = createBullet(this.scene, bulletGroup, 'bulletPlayer', this.x, this.y, angle, this.weapon.projectileSpeed);
     bullet.damage = this.weapon.damage;
     bullet.explodesOnHit = !!this.weapon.explodesOnHit;
@@ -278,8 +279,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   update(time, delta, scaledDelta, ctx) {
     const { cursors, keys, pointer, bulletGroup } = ctx;
 
-    // --- fire input, branches on the weapon's fire mode ---
-    const leftDown = pointer.leftButtonDown();
+    // --- fire input (LEFT click or SPACE), branches on the weapon's fire mode ---
+    const leftDown = pointer.leftButtonDown() || keys.SPACE.isDown;
 
     // Arm fire input the first time the button reads up -- until then (e.g. the
     // click that started the level is still being held down on this very first
@@ -305,12 +306,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       this.dashCooldownRemainingMs = Math.max(0, this.dashCooldownRemainingMs - scaledDelta);
     }
 
-    // --- dash (RIGHT click, fires toward the mouse) -- checks the button is currently
-    // down rather than just-pressed, so holding it through the cooldown fires again
-    // automatically the instant the cooldown clears, with no need to release and
+    // --- dash (RIGHT click or C, fires toward the mouse) -- checks the button is
+    // currently down rather than just-pressed, so holding it through the cooldown fires
+    // again automatically the instant the cooldown clears, with no need to release and
     // re-click. Blocked while charging or on weapon cooldown, same as firing is
     // blocked while dashing, for symmetry. ---
-    const rightDown = pointer.rightButtonDown();
+    const rightDown = pointer.rightButtonDown() || keys.Q.isDown;
     if (rightDown && !this.isDashing && !this.isCharging && !this.isOnCooldown && this.dashCooldownRemainingMs <= 0) {
       this.startDash(pointer);
     }
@@ -343,7 +344,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     if (!this.isDashing && this.lockRemainingMs <= 0) {
       const left = cursors.left.isDown || keys.A.isDown;
       const right = cursors.right.isDown || keys.D.isDown;
-      const jump = cursors.up.isDown || keys.W.isDown || keys.SPACE.isDown;
+      const jump = cursors.up.isDown || keys.W.isDown;
 
       // Applies during either a charge or a cooldown -- both represent "weapon busy"
       const firingPenaltyActive = this.isCharging || this.isOnCooldown;

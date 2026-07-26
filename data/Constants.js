@@ -31,6 +31,8 @@ export const DEFAULT_WORLD_BOUNDS = {
 
 export const ENEMY_MAX_INACCURACY_RAD = 1.5;
 
+export const WEAPON_MAX_INACCURACY_RAD = 0.3;
+
 export const BULLET_OFFSCREEN_MARGIN = 100;
 
 export const ENEMY_BASE_TINT = 0xe24b4a;

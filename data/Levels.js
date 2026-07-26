@@ -33,8 +33,8 @@ export const LEVELS = [
         ],
         texts: [
             { x: 250, y: 240, text: "Focus:", fontSize: "96px", color: "#7abfff" },
-            { x: 1600, y: 200, text: "Right Click to Dash" },
-            { x: 2350, y: 470, text: "Hold Left Click to Attack" },
+            { x: 1600, y: 200, text: "Right Click or Q to Dash" },
+            { x: 2350, y: 470, text: "Hold Left Click or Space Bar to Attack" },
         ],
         enemies: [],
         goal: {
@@ -106,7 +106,7 @@ export const LEVELS = [
                 affectedByGravity: true,
                 projectileSpeed: 400,
                 projectileCount: 1,
-                knockback: 300,
+                knockback: 250,
                 leftDist: 550,
             },
             {
@@ -178,91 +178,91 @@ export const LEVELS = [
                 x: 40,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 140,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 240,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 340,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 440,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 540,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 640,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 740,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 840,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 940,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 1040,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 1140,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
             {
                 x: 1240,
                 y: 30,
                 type: "default",
-                health: 2,
+                health: 1,
                 affectedByGravity: false,
             },
         ],
@@ -333,7 +333,7 @@ export const LEVELS = [
                 x: 150,
                 y: 740,
                 type: "turret",
-                shootCooldownMs: 2000,
+                shootCooldownMs: 2500,
                 health: 1,
                 angleDeg: 0,
             },
@@ -341,7 +341,7 @@ export const LEVELS = [
                 x: 250,
                 y: 740,
                 type: "turret",
-                shootCooldownMs: 2000,
+                shootCooldownMs: 2500,
                 health: 1,
                 angleDeg: 0,
             },
@@ -349,7 +349,7 @@ export const LEVELS = [
                 x: 350,
                 y: 740,
                 type: "turret",
-                shootCooldownMs: 2000,
+                shootCooldownMs: 2500,
                 health: 1,
                 angleDeg: 0,
             },
@@ -357,7 +357,7 @@ export const LEVELS = [
                 x: 450,
                 y: 740,
                 type: "turret",
-                shootCooldownMs: 2000,
+                shootCooldownMs: 2500,
                 health: 2,
                 angleDeg: 0,
             },
@@ -366,7 +366,7 @@ export const LEVELS = [
                 x: 1130,
                 y: 450,
                 type: "turret",
-                shootCooldownMs: 1800,
+                shootCooldownMs: 2400,
                 health: 1,
                 angleDeg: 180,
             },
@@ -374,7 +374,7 @@ export const LEVELS = [
                 x: 1030,
                 y: 450,
                 type: "turret",
-                shootCooldownMs: 1800,
+                shootCooldownMs: 2400,
                 health: 1,
                 angleDeg: 180,
             },
@@ -382,7 +382,7 @@ export const LEVELS = [
                 x: 930,
                 y: 450,
                 type: "turret",
-                shootCooldownMs: 1800,
+                shootCooldownMs: 2400,
                 health: 1,
                 angleDeg: 180,
             },
@@ -390,7 +390,7 @@ export const LEVELS = [
                 x: 830,
                 y: 450,
                 type: "turret",
-                shootCooldownMs: 1800,
+                shootCooldownMs: 2400,
                 health: 2,
                 angleDeg: 180,
             },
@@ -640,10 +640,11 @@ export const LEVELS = [
         },
         weapon: "default",
     },
+
     {
         name: "Acerbic",
         worldBounds: {
-            width: 30000,
+            width: 2000,
             height: 720
         },
         playerSpawn: {
@@ -652,7 +653,7 @@ export const LEVELS = [
         },
         timeLimitMs: 60000,
         platforms: [
-            { x1: 0, y1: 710, x2: 50000, y2: 720, type: "death" },
+            { x1: 0, y1: 710, x2: 2000, y2: 720, type: "death" },
 
             { x1: 100, y1: 540, x2: 300, y2: 570, type: "normal" },
 
@@ -1314,5 +1315,55 @@ export const LEVELS = [
         },
         weapon: "blaster",
     },
-    // 12 - big level again
+    {
+        name: "Obstreperous",
+        worldBounds: {
+            width: 3180,
+            height: 1500
+        },
+        playerSpawn: {
+            x: 200,
+            y: 420
+        },
+        timeLimitMs: 120000,
+        platforms: [
+            { x1: 0, y1: 610, x2: 1830, y2: 620, type: "death" },
+
+            { x1: 100, y1: 440, x2: 300, y2: 470, type: "normal" },
+
+            { x1: 600, y1: 350, x2: 800, y2: 380, type: "normal" },
+
+            { x1: 960, y1: 0, x2: 990, y2: 70, type: "enemyPassthrough" },
+            { x1: 990, y1: 40, x2: 1030, y2: 70, type: "enemyPassthrough" },
+
+            { x1: 1100, y1: 360, x2: 1300, y2: 370, type: "death" },
+            { x1: 1100, y1: 370, x2: 1300, y2: 400, type: "normal" },
+
+            { x1: 1500, y1: 400, x2: 1700, y2: 430, type: "normal" },
+
+            { x1: 1875, y1: 265, x2: 1925, y2: 315, type: "redirect", direction: 180 },
+
+            { x1: 0, y1: 620, x2: 1830, y2: 780, type: "normal" },
+            { x1: 1970, y1: 0, x2: 2000, y2: 780, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 1015,
+                y: 20,
+                shootCooldownMs: 1000,
+                health: 3,
+                accuracy: 0.5,
+                type: "default",
+                affectedByGravity: false,
+                projectileCount: 3,
+            },
+        ],
+        goal: {
+            x: 3075,
+            y: 690
+        },
+        weapon: "blaster",
+    },
 ];
