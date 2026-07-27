@@ -12,6 +12,35 @@ import { showPauseMenu } from "../ui/PauseMenu.js";
 import { spawnBulletBreakParticles, spawnBulletBounceParticles, spawnEnemyDeathParticles, startGoalActivationParticles } from "../fx/Particles.js";
 import { recordLevelCompletion } from "../save/SaveManager.js";
 
+const CHEAT = false;
+
+// Small "ready to fire" marker drawn around the mouse cursor: continuously while a
+// CHARGE-mode weapon is held at full charge (see update()), or as a one-frame flash
+// the instant a COOLDOWN-mode weapon fires (see spawnFireReadyIndicator(), called
+// from Player.updateCooldownFire()).
+const FIRE_READY_INDICATOR_SIZE = 14; // half-length of each arm, center to tip
+const FIRE_READY_INDICATOR_COLOR = BULLET_PLAYER_TINT;
+const FIRE_READY_INDICATOR_ALPHA = 0.35;
+const FIRE_READY_INDICATOR_LINE_WIDTH = 3;
+
+// Draws the plus/crosshair shape itself at (x, y) with the given depth -- shared by
+// the persistent CHARGE-mode indicator and the one-frame COOLDOWN-mode flash below,
+// so both stay visually identical. Built from a Graphics object (rather than the
+// Circle game object the ring version used) since a plus shape isn't one of Phaser's
+// built-in primitives.
+function drawFireReadyRing(scene, x, y) {
+  const g = scene.add.graphics({ x, y });
+  g.lineStyle(FIRE_READY_INDICATOR_LINE_WIDTH, FIRE_READY_INDICATOR_COLOR, FIRE_READY_INDICATOR_ALPHA);
+  g.beginPath();
+  g.moveTo(-FIRE_READY_INDICATOR_SIZE, 0);
+  g.lineTo(FIRE_READY_INDICATOR_SIZE, 0);
+  g.moveTo(0, -FIRE_READY_INDICATOR_SIZE);
+  g.lineTo(0, FIRE_READY_INDICATOR_SIZE);
+  g.strokePath();
+  g.setDepth(DEPTH.explosion);
+  return g;
+}
+
 export class GameScene extends Phaser.Scene {
   constructor() { super('GameScene'); }
 
@@ -44,6 +73,11 @@ export class GameScene extends Phaser.Scene {
     this.elapsedMs = 0;
 
     this.goalActivated = false; // guards startGoalActivationParticles firing more than once
+
+    // Persistent circle shown while a CHARGE-mode weapon is held at full charge --
+    // created lazily the first time it's needed and destroyed when it isn't; reset
+    // to null here since this scene instance is reused across levels (see winLevel()).
+    this.chargeReadyIndicator = null;
 
     // --- world bounds (per-level config, falls back to a default) ---
     this.worldBounds = level.worldBounds || DEFAULT_WORLD_BOUNDS;
@@ -304,6 +338,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   hitPlayer(bullet) {
+    if (CHEAT) return;
+
     if (this.gameEnded) return;
     spawnBulletBreakParticles(this, bullet.x, bullet.y, BULLET_ENEMY_TINT);
     bullet.destroy();
@@ -455,6 +491,20 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // One-frame flash of the "ready" circle at (x, y), for a COOLDOWN-mode weapon's
+  // shot -- unlike CHARGE mode (which shows the same circle continuously while held
+  // at full charge, see update()), a cooldown weapon fires the instant it's clicked,
+  // so this just marks that instant instead of tracking a held state.
+  spawnFireReadyIndicator(x, y) {
+    const circle = drawFireReadyRing(this, x, y);
+    this.tweens.add({
+      targets: circle,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => circle.destroy(),
+    });
+  }
+
   // Brief expanding, fading circle so an explosion actually reads as one rather than
   // dealing invisible splash damage.
   spawnExplosionEffect(x, y, radius) {
@@ -592,6 +642,22 @@ export class GameScene extends Phaser.Scene {
       pointer: this.input.activePointer,
       bulletGroup: this.playerBullets,
     });
+
+    // --- charge-ready indicator: shown while a CHARGE-mode weapon is held at full
+    // charge, tracking the pointer each frame; removed the instant it isn't (charge
+    // dropped below full, released/fired, or switched off charging entirely). The
+    // COOLDOWN-mode equivalent is a one-frame flash instead -- see
+    // spawnFireReadyIndicator(), triggered from Player.updateCooldownFire(). ---
+    const isFullyCharged = this.player.isCharging && this.player.getChargeRatio() === 1;
+    if (isFullyCharged) {
+      if (!this.chargeReadyIndicator) {
+        this.chargeReadyIndicator = drawFireReadyRing(this, 0, 0);
+      }
+      this.chargeReadyIndicator.setPosition(this.input.activePointer.worldX, this.input.activePointer.worldY);
+    } else if (this.chargeReadyIndicator) {
+      this.chargeReadyIndicator.destroy();
+      this.chargeReadyIndicator = null;
+    }
 
     // --- enemy shoot-cooldown/range checks (scaledDelta so bullet time slows enemy
     // fire rate the same way it slows everything else) ---

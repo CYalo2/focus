@@ -127,6 +127,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     if (leftDown && !this.isOnCooldown && !this.isDashing) {
       this.fireWeapon(pointer, bulletGroup);
+      // One-frame "ready" flash at the cursor, marking the shot -- the CHARGE-mode
+      // equivalent instead shows the same circle continuously while held at full
+      // charge (see GameScene.update()), since a cooldown weapon has no held state
+      // to linger on.
+      this.scene.spawnFireReadyIndicator(pointer.worldX, pointer.worldY);
       this.cooldownRemainingMs = this.weapon.cooldownMs;
       this.isOnCooldown = true;
     }
@@ -186,14 +191,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // ground the player is already touching would re-trigger on every horizontal check
   // (its overlap with the body never goes away, since it's not moving), making it
   // impossible to dash at all while grounded.
+  // Shrinks only the TRAILING edge of the swept box on each axis (the side you're
+  // moving away from) by `skin`, leaving the LEADING edge (the side you're moving
+  // toward) at full body size. That asymmetry is what makes both directions work at
+  // once: full size on approach means the check still blocks exactly at contact with
+  // no embedding, while the shrunk trailing edge means a surface you're already resting
+  // flush against (zero gap) doesn't get treated as a fresh blockage the instant you try
+  // to move away from it. When an axis isn't moving at all this step (a0 === a1, e.g.
+  // checking a purely horizontal move so y0 === y1), there's no "leading" side to keep
+  // precise, so both edges shrink -- that's the perpendicular-axis case (see the header
+  // comment above) where all we need is to not false-block on resting contact.
+  axisBounds(a0, a1, half, skin) {
+    if (a1 > a0) return { min: a0 - half + skin, max: a1 + half };
+    if (a1 < a0) return { min: a1 - half, max: a0 + half - skin };
+    return { min: a0 - half + skin, max: a0 + half - skin };
+  }
+
   wouldSweepCollideAt(x0, y0, x1, y1, skinX = 0, skinY = 0) {
     const scene = this.scene;
-    const halfW = this.body.width / 2 - skinX;
-    const halfH = this.body.height / 2 - skinY;
-    const minX = Math.min(x0, x1) - halfW;
-    const maxX = Math.max(x0, x1) + halfW;
-    const minY = Math.min(y0, y1) - halfH;
-    const maxY = Math.max(y0, y1) + halfH;
+    const halfW = this.body.width / 2;
+    const halfH = this.body.height / 2;
+    const { min: minX, max: maxX } = this.axisBounds(x0, x1, halfW, skinX);
+    const { min: minY, max: maxY } = this.axisBounds(y0, y1, halfH, skinY);
     const bodies = scene.physics.overlapRect(minX, minY, maxX - minX, maxY - minY, false, true);
     return bodies.some((body) => {
       const obj = body.gameObject;
@@ -273,9 +292,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       //
       // Each check sweeps the whole move, not just its endpoint -- see
       // wouldSweepCollideAt for why a destination-only check isn't enough at a corner.
-      // Each also shrinks the OTHER (non-moving) axis by DASH.skin, so merely resting
-      // against a surface perpendicular to this move -- e.g. standing on the ground
-      // while checking a purely horizontal step -- doesn't block it.
+      // DASH.skin is passed for both axes on every call; axisBounds applies it as a
+      // trailing-edge-only shrink on whichever axis is actually moving (so a wall you're
+      // moving away from doesn't block you, while one you're moving into still blocks
+      // precisely) and as a symmetric shrink on the other, non-moving axis (so merely
+      // resting against a surface perpendicular to this move -- e.g. standing on the
+      // ground while checking a purely horizontal step -- doesn't block it either).
       if (!this.wouldSweepCollideAt(this.x, this.y, targetX, this.y, DASH.skin, DASH.skin)) {
         this.x = targetX;
       }
