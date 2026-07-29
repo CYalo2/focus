@@ -42,6 +42,8 @@ export const LEVELS = [
             y: 690
         },
         weapon: "default",
+        open: true,
+        backgroundColor: 0x213469,
     },
     {
         name: "Perspicacious",
@@ -59,7 +61,7 @@ export const LEVELS = [
             { x1: 600, y1: 850, x2: 1100, y2: 900, type: "normal" },
             { x1: 1100, y1: 600, x2: 1400, y2: 900, type: "normal" },
 
-            { x1: 1370, y1: 850, x2: 1930, y2: 900, type: "normal" },
+            { x1: 1400, y1: 850, x2: 1930, y2: 900, type: "normal" },
             { x1: 1400, y1: 600, x2: 1500, y2: 630, type: "normal" },
             { x1: 1500, y1: 600, x2: 1800, y2: 630, type: "bulletPassthrough" },
             { x1: 1800, y1: 600, x2: 1900, y2: 630, type: "normal" },
@@ -143,6 +145,8 @@ export const LEVELS = [
             y: 460
         },
         weapon: "default",
+        open: true,
+        backgroundColor: 0x3b545b,
     },
     {
         name: "Malleable",
@@ -157,18 +161,18 @@ export const LEVELS = [
         timeLimitMs: 50000,
         platforms: [
             { x1: 0, y1: 670, x2: 1280, y2: 720, type: "normal" },
-            { x1: 40, y1: 60, x2: 140, y2: 90, type: "breakable", health: 6 },
-            { x1: 140, y1: 60, x2: 240, y2: 90, type: "breakable", health: 6 },
-            { x1: 240, y1: 60, x2: 340, y2: 90, type: "breakable", health: 6 },
-            { x1: 340, y1: 60, x2: 440, y2: 90, type: "breakable", health: 6 },
-            { x1: 440, y1: 60, x2: 540, y2: 90, type: "breakable", health: 6 },
-            { x1: 540, y1: 60, x2: 640, y2: 90, type: "breakable", health: 6 },
-            { x1: 640, y1: 60, x2: 740, y2: 90, type: "breakable", health: 6 },
-            { x1: 740, y1: 60, x2: 840, y2: 90, type: "breakable", health: 6 },
-            { x1: 840, y1: 60, x2: 940, y2: 90, type: "breakable", health: 6 },
-            { x1: 940, y1: 60, x2: 1040, y2: 90, type: "breakable", health: 6 },
-            { x1: 1040, y1: 60, x2: 1140, y2: 90, type: "breakable", health: 6 },
-            { x1: 1140, y1: 60, x2: 1240, y2: 90, type: "breakable", health: 6 },
+            { x1: 40, y1: 60, x2: 140, y2: 90, type: "breakable", health: 5 },
+            { x1: 140, y1: 60, x2: 240, y2: 90, type: "breakable", health: 5 },
+            { x1: 240, y1: 60, x2: 340, y2: 90, type: "breakable", health: 5 },
+            { x1: 340, y1: 60, x2: 440, y2: 90, type: "breakable", health: 5 },
+            { x1: 440, y1: 60, x2: 540, y2: 90, type: "breakable", health: 5 },
+            { x1: 540, y1: 60, x2: 640, y2: 90, type: "breakable", health: 5 },
+            { x1: 640, y1: 60, x2: 740, y2: 90, type: "breakable", health: 5 },
+            { x1: 740, y1: 60, x2: 840, y2: 90, type: "breakable", health: 5 },
+            { x1: 840, y1: 60, x2: 940, y2: 90, type: "breakable", health: 5 },
+            { x1: 940, y1: 60, x2: 1040, y2: 90, type: "breakable", health: 5 },
+            { x1: 1040, y1: 60, x2: 1140, y2: 90, type: "breakable", health: 5 },
+            { x1: 1140, y1: 60, x2: 1240, y2: 90, type: "breakable", health: 5 },
         ],
         texts: [
             { x: 640, y: 420, text: "Some Levels Utilize Different Weapons" },
@@ -271,6 +275,8 @@ export const LEVELS = [
             y: 640
         },
         weapon: "beam",
+        open: false,
+        backgroundColor: 0x574841,
     },
     {
         name: "Concomitant",
@@ -400,6 +406,8 @@ export const LEVELS = [
             y: 150
         },
         weapon: "beam",
+        open: false,
+        backgroundColor: 0xa88989,
     },
     {
         name: "Oblique",
@@ -455,6 +463,8 @@ export const LEVELS = [
             y: 660
         },
         weapon: "default",
+        open: false,
+        backgroundColor: 0x91a47e,
     },
     {
         name: "Synthesis",
@@ -639,6 +649,8 @@ export const LEVELS = [
             y: 620
         },
         weapon: "default",
+        open: false,
+        backgroundColor: 0x304993,
     },
 
     {
@@ -695,6 +707,8 @@ export const LEVELS = [
             y: 510
         },
         weapon: "default",
+        open: true,
+        backgroundColor: 0x3f2f40,
     },
     {
         name: "Transmute",
@@ -819,18 +833,20 @@ export const LEVELS = [
             y: 440
         },
         weapon: "default",
+        open: false,
+        backgroundColor: 0x623569,
     },
     {
         name: "Viscous",
         worldBounds: {
             width: 1280,
-            height: 1600
+            height: 1100
         },
         playerSpawn: {
             x: 640,
             y: 120
         },
-        timeLimitMs: 40000,
+        timeLimitMs: 45000,
         platforms: [
             { x1: 0, y1: 0, x2: 1280, y2: 50, type: "normal" },
             { x1: 0, y1: 50, x2: 50, y2: 1050, type: "normal" },
@@ -945,6 +961,8 @@ export const LEVELS = [
             y: 120
         },
         weapon: "default",
+        open: false,
+        backgroundColor: 0x49567b,
     },
     {
         name: "Oscillate",
@@ -1120,101 +1138,103 @@ export const LEVELS = [
             y: 330
         },
         weapon: "default",
+        open: false,
+        backgroundColor: 0x87966f,
     },
     {
         name: "Destitute",
         worldBounds: {
-            width: 1200,
+            width: 1280,
             height: 1200
         },
         playerSpawn: {
-            x: 600,
+            x: 640,
             y: 600
         },
         timeLimitMs: 180000,
         platforms: [
-            { x1: 0, y1: 0, x2: 1200, y2: 50, type: "normal" },
-            { x1: 0, y1: 50, x2: 50, y2: 1150, type: "normal" },
-            { x1: 1150, y1: 50, x2: 1200, y2: 1150, type: "normal" },
-            { x1: 0, y1: 1150, x2: 1200, y2: 1200, type: "normal" },
+            { x1: 0, y1: 0, x2: 1280, y2: 50, type: "normal" },
+            { x1: 0, y1: 50, x2: 90, y2: 1150, type: "normal" },
+            { x1: 1190, y1: 50, x2: 1280, y2: 1150, type: "normal" },
+            { x1: 0, y1: 1150, x2: 1280, y2: 1200, type: "normal" },
 
             // Bottom Left
-            { x1: 540, y1: 630, x2: 630, y2: 660, type: "breakable", health: 1 },
-            { x1: 540, y1: 660, x2: 570, y2: 750, type: "breakable", health: 5 },
-            { x1: 300, y1: 630, x2: 540, y2: 660, type: "breakable", health: 5 },
-            { x1: 300, y1: 750, x2: 570, y2: 780, type: "breakable", health: 5 },
-            { x1: 540, y1: 780, x2: 570, y2: 900, type: "breakable", health: 5 },
-            { x1: 420, y1: 780, x2: 450, y2: 900, type: "breakable", health: 5 },
-            { x1: 420, y1: 660, x2: 450, y2: 750, type: "breakable", health: 5 },
-            { x1: 270, y1: 300, x2: 300, y2: 930, type: "breakable", health: 6 },
-            { x1: 345, y1: 930, x2: 375, y2: 1150, type: "breakable", health: 5 },
-            { x1: 50, y1: 825, x2: 270, y2: 855, type: "breakable", health: 5 },
+            { x1: 580, y1: 630, x2: 670, y2: 660, type: "breakable", health: 1 },
+            { x1: 580, y1: 660, x2: 610, y2: 750, type: "breakable", health: 5 },
+            { x1: 340, y1: 630, x2: 580, y2: 660, type: "breakable", health: 5 },
+            { x1: 340, y1: 750, x2: 610, y2: 780, type: "breakable", health: 5 },
+            { x1: 580, y1: 780, x2: 610, y2: 900, type: "breakable", health: 5 },
+            { x1: 460, y1: 780, x2: 490, y2: 900, type: "breakable", health: 5 },
+            { x1: 460, y1: 660, x2: 490, y2: 750, type: "breakable", health: 5 },
+            { x1: 310, y1: 300, x2: 340, y2: 930, type: "breakable", health: 6 },
+            { x1: 385, y1: 930, x2: 415, y2: 1150, type: "breakable", health: 5 },
+            { x1: 90, y1: 825, x2: 310, y2: 855, type: "breakable", health: 5 },
 
-            { x1: 50, y1: 1050, x2: 100, y2: 1100, type: "breakable", health: 10 },
-            { x1: 100, y1: 1050, x2: 150, y2: 1100, type: "breakable", health: 10 },
-            { x1: 100, y1: 1100, x2: 150, y2: 1150, type: "breakable", health: 10 },
+            { x1: 90, y1: 1050, x2: 140, y2: 1100, type: "breakable", health: 10 },
+            { x1: 140, y1: 1050, x2: 190, y2: 1100, type: "breakable", health: 10 },
+            { x1: 140, y1: 1100, x2: 190, y2: 1150, type: "breakable", health: 10 },
 
             // Bottom Right
-            { x1: 630, y1: 570, x2: 660, y2: 660, type: "breakable", health: 1 },
-            { x1: 660, y1: 630, x2: 750, y2: 660, type: "breakable", health: 5 },
-            { x1: 630, y1: 660, x2: 660, y2: 900, type: "breakable", health: 5 },
-            { x1: 750, y1: 630, x2: 780, y2: 900, type: "breakable", health: 5 },
-            { x1: 780, y1: 630, x2: 900, y2: 660, type: "breakable", health: 5 },
-            { x1: 780, y1: 750, x2: 900, y2: 780, type: "breakable", health: 5 },
-            { x1: 660, y1: 750, x2: 750, y2: 780, type: "breakable", health: 5 },
-            { x1: 300, y1: 900, x2: 930, y2: 930, type: "breakable", health: 6 },
-            { x1: 825, y1: 930, x2: 855, y2: 1150, type: "breakable", health: 5 },
-            { x1: 930, y1: 825, x2: 1150, y2: 855, type: "breakable", health: 5 },
+            { x1: 670, y1: 570, x2: 700, y2: 660, type: "breakable", health: 1 },
+            { x1: 700, y1: 630, x2: 790, y2: 660, type: "breakable", health: 5 },
+            { x1: 670, y1: 660, x2: 700, y2: 900, type: "breakable", health: 5 },
+            { x1: 790, y1: 630, x2: 820, y2: 900, type: "breakable", health: 5 },
+            { x1: 820, y1: 630, x2: 940, y2: 660, type: "breakable", health: 5 },
+            { x1: 820, y1: 750, x2: 940, y2: 780, type: "breakable", health: 5 },
+            { x1: 700, y1: 750, x2: 790, y2: 780, type: "breakable", health: 5 },
+            { x1: 340, y1: 900, x2: 970, y2: 930, type: "breakable", health: 6 },
+            { x1: 865, y1: 930, x2: 895, y2: 1150, type: "breakable", health: 5 },
+            { x1: 970, y1: 825, x2: 1190, y2: 855, type: "breakable", health: 5 },
 
-            { x1: 1050, y1: 1100, x2: 1100, y2: 1150, type: "breakable", health: 10 },
-            { x1: 1050, y1: 1050, x2: 1100, y2: 1100, type: "breakable", health: 10 },
-            { x1: 1100, y1: 1050, x2: 1150, y2: 1100, type: "breakable", health: 10 },
+            { x1: 1090, y1: 1100, x2: 1140, y2: 1150, type: "breakable", health: 10 },
+            { x1: 1090, y1: 1050, x2: 1140, y2: 1100, type: "breakable", health: 10 },
+            { x1: 1140, y1: 1050, x2: 1190, y2: 1100, type: "breakable", health: 10 },
 
             // Top Left
-            { x1: 540, y1: 540, x2: 570, y2: 630, type: "breakable", health: 1 },
-            { x1: 450, y1: 540, x2: 540, y2: 570, type: "breakable", health: 5 },
-            { x1: 540, y1: 300, x2: 570, y2: 540, type: "breakable", health: 5 },
-            { x1: 420, y1: 300, x2: 450, y2: 570, type: "breakable", health: 5 },
-            { x1: 300, y1: 540, x2: 420, y2: 570, type: "breakable", health: 5 },
-            { x1: 300, y1: 420, x2: 420, y2: 450, type: "breakable", health: 5 },
-            { x1: 450, y1: 420, x2: 540, y2: 450, type: "breakable", health: 5 },
-            { x1: 270, y1: 270, x2: 900, y2: 300, type: "breakable", health: 6 },
-            { x1: 345, y1: 50, x2: 375, y2: 270, type: "breakable", health: 5 },
-            { x1: 50, y1: 345, x2: 270, y2: 375, type: "breakable", health: 5 },
+            { x1: 580, y1: 540, x2: 610, y2: 630, type: "breakable", health: 1 },
+            { x1: 490, y1: 540, x2: 580, y2: 570, type: "breakable", health: 5 },
+            { x1: 580, y1: 300, x2: 610, y2: 540, type: "breakable", health: 5 },
+            { x1: 460, y1: 300, x2: 490, y2: 570, type: "breakable", health: 5 },
+            { x1: 340, y1: 540, x2: 460, y2: 570, type: "breakable", health: 5 },
+            { x1: 340, y1: 420, x2: 460, y2: 450, type: "breakable", health: 5 },
+            { x1: 490, y1: 420, x2: 580, y2: 450, type: "breakable", health: 5 },
+            { x1: 310, y1: 270, x2: 940, y2: 300, type: "breakable", health: 6 },
+            { x1: 385, y1: 50, x2: 415, y2: 270, type: "breakable", health: 5 },
+            { x1: 90, y1: 345, x2: 310, y2: 375, type: "breakable", health: 5 },
 
-            { x1: 50, y1: 100, x2: 100, y2: 150, type: "breakable", health: 10 },
-            { x1: 100, y1: 50, x2: 150, y2: 100, type: "breakable", health: 10 },
-            { x1: 100, y1: 100, x2: 150, y2: 150, type: "breakable", health: 10 },
+            { x1: 90, y1: 100, x2: 140, y2: 150, type: "breakable", health: 10 },
+            { x1: 140, y1: 50, x2: 190, y2: 100, type: "breakable", health: 10 },
+            { x1: 140, y1: 100, x2: 190, y2: 150, type: "breakable", health: 10 },
 
             // Top Right
-            { x1: 570, y1: 540, x2: 660, y2: 570, type: "breakable", health: 1 },
-            { x1: 630, y1: 450, x2: 660, y2: 540, type: "breakable", health: 5 },
-            { x1: 660, y1: 540, x2: 900, y2: 570, type: "breakable", health: 5 },
-            { x1: 630, y1: 420, x2: 900, y2: 450, type: "breakable", health: 5 },
-            { x1: 630, y1: 300, x2: 660, y2: 420, type: "breakable", health: 5 },
-            { x1: 750, y1: 300, x2: 780, y2: 420, type: "breakable", health: 5 },
-            { x1: 750, y1: 450, x2: 780, y2: 540, type: "breakable", health: 5 },
-            { x1: 900, y1: 270, x2: 930, y2: 900, type: "breakable", health: 6 },
-            { x1: 825, y1: 50, x2: 855, y2: 270, type: "breakable", health: 5 },
-            { x1: 930, y1: 345, x2: 1150, y2: 375, type: "breakable", health: 5 },
+            { x1: 610, y1: 540, x2: 700, y2: 570, type: "breakable", health: 1 },
+            { x1: 670, y1: 450, x2: 700, y2: 540, type: "breakable", health: 5 },
+            { x1: 700, y1: 540, x2: 940, y2: 570, type: "breakable", health: 5 },
+            { x1: 670, y1: 420, x2: 940, y2: 450, type: "breakable", health: 5 },
+            { x1: 670, y1: 300, x2: 700, y2: 420, type: "breakable", health: 5 },
+            { x1: 790, y1: 300, x2: 820, y2: 420, type: "breakable", health: 5 },
+            { x1: 790, y1: 450, x2: 820, y2: 540, type: "breakable", health: 5 },
+            { x1: 940, y1: 270, x2: 970, y2: 900, type: "breakable", health: 6 },
+            { x1: 865, y1: 50, x2: 895, y2: 270, type: "breakable", health: 5 },
+            { x1: 970, y1: 345, x2: 1190, y2: 375, type: "breakable", health: 5 },
 
-            { x1: 1050, y1: 100, x2: 1100, y2: 150, type: "breakable", health: 10 },
-            { x1: 1050, y1: 50, x2: 1100, y2: 100, type: "breakable", health: 10 },
-            { x1: 1100, y1: 100, x2: 1150, y2: 150, type: "breakable", health: 10 },
+            { x1: 1090, y1: 100, x2: 1140, y2: 150, type: "breakable", health: 10 },
+            { x1: 1090, y1: 50, x2: 1140, y2: 100, type: "breakable", health: 10 },
+            { x1: 1140, y1: 100, x2: 1190, y2: 150, type: "breakable", health: 10 },
         ],
         texts: [
         ],
         enemies: [
             // Bottom Left
             {
-                x: 495,
+                x: 535,
                 y: 705,
                 type: "default",
                 health: 1,
                 knockback: 300,
             },
             {
-                x: 360,
+                x: 400,
                 y: 840,
                 type: "default",
                 initialCooldownMs: 4000,
@@ -1223,7 +1243,7 @@ export const LEVELS = [
                 knockback: 300,
             },
             {
-                x: 75,
+                x: 115,
                 y: 1125,
                 type: "default",
                 health: 3,
@@ -1233,14 +1253,14 @@ export const LEVELS = [
 
             // Bottom Right
             {
-                x: 705,
+                x: 745,
                 y: 705,
                 type: "default",
                 health: 1,
                 knockback: 300,
             },
             {
-                x: 840,
+                x: 880,
                 y: 840,
                 type: "default",
                 initialCooldownMs: 4000,
@@ -1249,7 +1269,7 @@ export const LEVELS = [
                 knockback: 300,
             },
             {
-                x: 1125,
+                x: 1165,
                 y: 1125,
                 type: "default",
                 health: 3,
@@ -1259,14 +1279,14 @@ export const LEVELS = [
 
             // Top Left
             {
-                x: 495,
+                x: 535,
                 y: 495,
                 type: "default",
                 health: 1,
                 knockback: 300,
             },
             {
-                x: 360,
+                x: 400,
                 y: 360,
                 type: "default",
                 initialCooldownMs: 4000,
@@ -1275,7 +1295,7 @@ export const LEVELS = [
                 knockback: 300,
             },
             {
-                x: 75,
+                x: 115,
                 y: 75,
                 type: "default",
                 health: 3,
@@ -1285,14 +1305,14 @@ export const LEVELS = [
 
             // Top Right
             {
-                x: 705,
+                x: 745,
                 y: 495,
                 type: "default",
                 health: 1,
                 knockback: 300,
             },
             {
-                x: 840,
+                x: 880,
                 y: 360,
                 type: "default",
                 initialCooldownMs: 4000,
@@ -1301,7 +1321,7 @@ export const LEVELS = [
                 knockback: 300,
             },
             {
-                x: 1125,
+                x: 1165,
                 y: 75,
                 type: "default",
                 health: 3,
@@ -1310,10 +1330,12 @@ export const LEVELS = [
             },
         ],
         goal: {
-            x: 600,
+            x: 640,
             y: 600
         },
         weapon: "blaster",
+        open: false,
+        backgroundColor: 0x765661,
     },
     {
         name: "Obstreperous",
@@ -1342,7 +1364,7 @@ export const LEVELS = [
 
             { x1: 1500, y1: 400, x2: 1700, y2: 430, type: "oneway" },
 
-            { x1: 1875, y1: 265, x2: 1925, y2: 315, type: "redirect", direction: 180 },
+            { x1: 1875, y1: 260, x2: 1925, y2: 310, type: "redirect", direction: 180 },
 
             { x1: 0, y1: 620, x2: 1810, y2: 780, type: "normal" },
             { x1: 1925, y1: 0, x2: 2015, y2: 780, type: "normal" },
@@ -1471,7 +1493,7 @@ export const LEVELS = [
                 type: "turret",
                 health: 1,
                 accuracy: 1,
-                shootCooldownMs: 200,
+                shootCooldownMs: 250,
                 angleDeg: 270,
                 affectedByGravity: false,
             },
@@ -1630,5 +1652,7 @@ export const LEVELS = [
             y: 1930
         },
         weapon: "blaster",
+        open: false,
+        backgroundColor: 0x6fb6b3,
     },
 ];

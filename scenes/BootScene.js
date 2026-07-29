@@ -1,4 +1,4 @@
-import { ENEMY_BASE_TINT, BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, GOAL_BASE_TINT, PLAYER_BASE_TINT } from "../data/Constants.js";
+import { ENEMY_BASE_TINT, BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, GOAL_BASE_TINT } from "../data/Constants.js";
 
 export class BootScene extends Phaser.Scene {
 
@@ -6,15 +6,21 @@ export class BootScene extends Phaser.Scene {
         super("BootScene");
     }
 
+    preload() {
+        this.load.spritesheet("player", "assets/player.png", { frameWidth: 14, frameHeight: 20 });
+
+        this.load.spritesheet("default_weapon", "assets/weapon/default.png", { frameWidth: 11, frameHeight: 8 });
+        this.load.spritesheet("beam_weapon", "assets/weapon/beam.png", { frameWidth: 13, frameHeight: 7 });
+        this.load.spritesheet("blaster_weapon", "assets/weapon/blaster.png", { frameWidth: 11, frameHeight: 8 });
+
+        this.load.image("tile", "assets/tile/tile.png");
+        this.load.image("background_tile", "assets/tile/background_tile.png");
+        this.load.image("breakable_tile", "assets/tile/breakable_tile.png");
+    }
+    
     create() {
 
         const g = this.add.graphics();
-
-        // Player
-        g.clear();
-        g.fillStyle(PLAYER_BASE_TINT, 1);
-        g.fillRect(0, 0, 28, 40);
-        g.generateTexture("player", 28, 40);
 
         // Enemy
         g.clear();
@@ -24,7 +30,7 @@ export class BootScene extends Phaser.Scene {
 
         // Platform
         g.clear();
-        g.fillStyle(0x555550, 1);
+        g.fillStyle(0xffffff, 1);
         g.fillRect(0, 0, 32, 32);
         g.generateTexture("platform", 32, 32);
 
@@ -60,7 +66,80 @@ export class BootScene extends Phaser.Scene {
 
         g.destroy();
 
+        this.anims.create({
+            key: "player_idle",
+            frames: this.anims.generateFrameNumbers("player", { start: 0, end: 0 }),
+        });
+        this.anims.create({
+            key: "player_run",
+            frames: this.anims.generateFrameNumbers("player", { start: 0, end: 1 }),
+            frameRate: 6,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "player_fall",
+            frames: this.anims.generateFrameNumbers("player", { start: 2, end: 2 }),
+        });
+        this.anims.create({
+            key: "player_rise",
+            frames: this.anims.generateFrameNumbers("player", { start: 3, end: 3 }),
+        });
+        this.anims.create({
+            key: "player_idle_c",
+            frames: this.anims.generateFrameNumbers("player", { start: 4, end: 4 }),
+        });
+        this.anims.create({
+            key: "player_run_c",
+            frames: this.anims.generateFrameNumbers("player", { start: 4, end: 5 }),
+            frameRate: 4,
+            repeat: -1
+        });
+        this.anims.create({
+            key: "player_fall_c",
+            frames: this.anims.generateFrameNumbers("player", { start: 6, end: 6 }),
+        });
+        this.anims.create({
+            key: "player_rise_c",
+            frames: this.anims.generateFrameNumbers("player", { start: 7, end: 7 }),
+        });
+
+        this.anims.create({
+            key: "default_weapon_idle",
+            frames: this.anims.generateFrameNumbers("default_weapon", { start: 0, end: 0 }),
+        });
+        this.anims.create({
+            key: "default_weapon_charge",
+            frames: this.anims.generateFrameNumbers("default_weapon", { start: 1, end: 3 }),
+            frameRate: 10,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "default_weapon_ready",
+            frames: this.anims.generateFrameNumbers("default_weapon", { start: 4, end: 4 }),
+        });
+        this.anims.create({
+            key: "beam_weapon_idle",
+            frames: this.anims.generateFrameNumbers("beam_weapon", { start: 0, end: 0 }),
+        });
+        this.anims.create({
+            key: "beam_weapon_charge",
+            frames: this.anims.generateFrameNumbers("beam_weapon", { start: 1, end: 5 }),
+            frameRate: 10,
+            repeat: 0
+        });
+        this.anims.create({
+            key: "beam_weapon_ready",
+            frames: this.anims.generateFrameNumbers("beam_weapon", { start: 6, end: 6 }),
+        });
+        this.anims.create({
+            key: "blaster_weapon_idle",
+            frames: this.anims.generateFrameNumbers("blaster_weapon", { start: 0, end: 0 }),
+        });
+        this.anims.create({
+            key: "blaster_weapon_cooldown",
+            frames: this.anims.generateFrameNumbers("blaster_weapon", { start: 1, end: 1 }),
+        });
+
         this.scene.start("MenuScene");
     }
-
 }

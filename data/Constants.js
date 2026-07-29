@@ -10,8 +10,20 @@ export const PLAYER_STATS = {
 
 export const ENEMY_KNOCKBACK_DRAG = 1400;
 
-export const CHARGING_TINT = 0xff8a3a;
-export const CHARGE_READY_TINT = 0xffe066;
+// Single subtle shade applied to the player while charging, fully charged, or on
+// weapon cooldown alike -- replaces the old three separate per-state tints. Close to
+// white (0xffffff = no change) so it reads as "very slightly shaded", not a color swap.
+export const PLAYER_BUSY_TINT = 0xd8d8d8;
+
+// How far (px) the weapon display sprite sits from the player's center, along the
+// aim direction -- see Player.updateWeaponDisplay().
+export const WEAPON_DISPLAY_DISTANCE = 32;
+
+// Repeating flash shown on the weapon display sprite while a CHARGE-mode weapon is
+// held at full charge -- alternates with the sprite's normal look every
+// WEAPON_FLASH_INTERVAL_MS. See Player.updateWeaponDisplay().
+export const WEAPON_FLASH_TINT = 0xffff00;
+export const WEAPON_FLASH_INTERVAL_MS = 100;
 
 export const CHARGE_MIN_OPACITY = 0.3;
 
@@ -56,18 +68,23 @@ export const ENEMY_WARNING_TINT = 0xff7a5c;
 export const ENEMY_OUT_OF_RANGE_TINT = 0x8a5a5a;
 
 export const BULLET_PLAYER_TINT = 0xffd23a;
-export const BULLET_ENEMY_TINT = 0xff8a3a;
+export const BULLET_ENEMY_TINT = 0xff1600;
 export const GOAL_BASE_TINT = 0x63c722;
-export const PLAYER_BASE_TINT = 0x3aa0ff;
+
+export const PLAYER_DASH_PARTICLES = 0x5fcde4;
 
 export const HIT_FLASH_BRIGHTEN_AMOUNT = 0.6;
 
+export const TILE_SIZE = 32;
+
 export const DEPTH = {
-    platform: 0,
-    levelText: 1,
-    goal: 2,
-    enemy: 3,
-    player: 4,
-    bullet: 5,
-    explosion: 6,
+    background: 0,
+    platform: 1,
+    levelText: 2,
+    goal: 3,
+    enemy: 4,
+    player: 5,
+    weapon: 6,
+    bullet: 7,
+    explosion: 8,
 };

@@ -9,10 +9,42 @@ import { destroyOffscreenBullets, reorientBullet, redirectBullet } from "../enti
 import { Hud } from "../ui/Hud.js";
 import { showEndScreen } from "../ui/EndScreen.js";
 import { showPauseMenu } from "../ui/PauseMenu.js";
-import { spawnBulletBreakParticles, spawnBulletBounceParticles, spawnEnemyDeathParticles, startGoalActivationParticles } from "../fx/Particles.js";
+import { spawnBulletBreakParticles, spawnBulletBounceParticles, spawnEnemyDeathParticles, startGoalActivationParticles, spawnPlatformHitParticles, spawnPlatformBreakParticles } from "../fx/Particles.js";
 import { recordLevelCompletion } from "../save/SaveManager.js";
 
 const CHEAT = false;
+
+// Duration (ms) of the brief flash that confirms an in-game R press registered, and
+// how long retryLevelWithFlash() waits before actually restarting the scene -- kept
+// equal so the flash has time to fully fade out first (see below).
+const RETRY_FLASH_DURATION_MS = 120;
+// Peak opacity of that flash. Deliberately low -- Phaser's built-in camera.flash()
+// always peaks at fully-opaque white regardless of duration, which reads as the whole
+// screen changing rather than a subtle confirmation, so this draws its own overlay
+// rectangle at a faint alpha and tweens that down to 0 instead.
+const RETRY_FLASH_ALPHA = 0.12;
+
+// Tracks which keys are PHYSICALLY held down right now, independent of any Phaser
+// Key object. scene.restart() (used by retryLevel()) tears down and rebuilds the
+// scene's input plugin, so the fresh this.cursors/this.keys objects it creates always
+// start isDown=false -- even if the real key never actually came up. Without this,
+// holding a movement key and tapping R to retry mid-move would silently drop that
+// key's held state until you released and pressed it again. This Set lives at module
+// scope (not on the scene) specifically so it survives every restart; syncHeldKeys()
+// below reads from it right after the new Key objects are created in create().
+const heldKeyCodes = new Set();
+window.addEventListener("keydown", (e) => heldKeyCodes.add(e.keyCode));
+window.addEventListener("keyup", (e) => heldKeyCodes.delete(e.keyCode));
+// Also clear on blur (alt-tab, clicking outside the game) -- the keyup for a held key
+// never fires if focus leaves the page before the key is released, which would
+// otherwise leave it stuck "held" forever afterward.
+window.addEventListener("blur", () => heldKeyCodes.clear());
+
+function syncHeldKeys(...keys) {
+  for (const key of keys) {
+    if (heldKeyCodes.has(key.keyCode)) key.isDown = true;
+  }
+}
 
 // Small "ready to fire" marker drawn around the mouse cursor: continuously while a
 // CHARGE-mode weapon is held at full charge (see update()), or as a one-frame flash
@@ -93,10 +125,27 @@ export class GameScene extends Phaser.Scene {
     // anything currently in Weapons.js/EnemyTypes.js, with headroom for faster ones later.
     this.physics.world.setFPS(240);
     this.cameras.main.setBounds(0, 0, this.worldBounds.width, this.worldBounds.height);
-    this.cameras.main.setBackgroundColor('#1a1a22');
+
+    // NOTE: this replaces the old setup where the background was a world-space object
+    // (scrollFactor 1) sized to the full level and pinned at world (0,0), which
+    // platformsNormal's tileSprites (see Platform.js) used as a phase reference to keep
+    // their own tile pattern aligned with this one. Since the background no longer
+    // scrolls in lockstep with the world, that alignment will drift. If you want
+    // platform tiles to keep lining up with the background, Platform.js will need a
+    // matching change -- happy to take a look if you share it.
+    this.backgroundScrollFactor = level.open ? 0.8 : 0.6;
+    this.background = this.add
+      .tileSprite(0, 0, this.cameras.main.width, this.cameras.main.height, 'background_tile')
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(DEPTH.background);
+    // Per-level background tint -- falls back to no tint (0xffffff, i.e. the tile's
+    // own natural colors) if a level doesn't specify one.
+    this.background.setTint(level.backgroundColor !== undefined ? level.backgroundColor : 0xffffff);
+    this.background.setTileScale(2, 2);
 
     // --- platforms (split by type) ---
-    const platforms = createPlatforms(this, level.platforms);
+    const platforms = createPlatforms(this, level.platforms, level.backgroundColor);
     this.platformsNormal = platforms.platformsNormal;
     this.platformsOneway = platforms.platformsOneway;
     this.platformsBreakable = platforms.platformsBreakable;
@@ -236,6 +285,12 @@ export class GameScene extends Phaser.Scene {
     // --- input ---
     this.cursors = this.input.keyboard.createCursorKeys();
     this.keys = this.input.keyboard.addKeys('W,A,S,D,SPACE,SHIFT,Q');
+    // These are brand-new Key objects (isDown defaults to false) even if the player is
+    // mid-restart with a movement key physically still held -- see heldKeyCodes above.
+    syncHeldKeys(
+      this.cursors.up, this.cursors.down, this.cursors.left, this.cursors.right,
+      this.keys.W, this.keys.A, this.keys.S, this.keys.D, this.keys.SPACE, this.keys.SHIFT, this.keys.Q
+    );
     this.input.mouse.disableContextMenu();
 
     // --- HUD (fixed to camera) ---
@@ -257,6 +312,13 @@ export class GameScene extends Phaser.Scene {
     // fires the instant E is pressed even though update() bails out early while
     // isPaused is true (which is what actually freezes gameplay).
     this.input.keyboard.on("keydown-E", () => this.togglePause());
+    // Same reasoning for R -- bound via the keyboard event rather than polled, so it
+    // still fires a quick retry even while paused (retryLevel() resumes first before
+    // restarting), not just during live gameplay. Unlike the HUD/pause-menu retry
+    // buttons (which call retryLevel() directly with no feedback of their own), this
+    // is a bare keypress with nothing visible under the cursor to confirm it landed --
+    // so this handler gives it its own brief camera flash first, then restarts.
+    this.input.keyboard.on("keydown-R", () => this.retryLevelWithFlash());
   }
 
   togglePause() {
@@ -277,6 +339,17 @@ export class GameScene extends Phaser.Scene {
     // to be frozen explicitly -- otherwise they'd keep animating behind the pause menu.
     this.tweens.pauseAll();
     this.time.paused = true;
+    // Sprite animations (player run/idle/rise/fall, any enemy anims) are also driven
+    // independently of update() -- physics.pause() freezes movement but a still-playing
+    // idle/run cycle would keep advancing frames behind the pause menu without this.
+    // this.anims is the game-wide AnimationManager (shared across scenes), but that's
+    // fine here since only one scene is ever actually running gameplay at a time.
+    this.anims.pauseAll();
+    // Re-arm the same guard Player uses against the click that started the level (see
+    // fireInputArmed in Player.js) -- update() doesn't run at all while paused, so
+    // without this, the very click that lands on "Resume" is still down on the first
+    // post-pause frame and would otherwise read as an immediate fire input.
+    this.player.fireInputArmed = false;
     showPauseMenu(this).catch((err) => console.error("Failed to show pause menu:", err));
   }
 
@@ -290,6 +363,43 @@ export class GameScene extends Phaser.Scene {
     this.physics.resume();
     this.tweens.resumeAll();
     this.time.paused = false;
+    this.anims.resumeAll();
+  }
+
+  // Quick retry, callable from anywhere (R key, the HUD's retry button) without going
+  // through the pause menu. No retrying over the win/lose screen, same as togglePause().
+  // resumeGame() first (a no-op if we weren't paused) for the same reason PauseMenu's
+  // restart button calls it before scene.restart() -- it's what clears this.time.paused,
+  // which otherwise survives into the next scene instance and leaves every delayedCall
+  // the new level schedules (hit-flash clears, platform damage-flash clears) never firing.
+  retryLevel() {
+    if (this.gameEnded) return;
+    this.resumeGame();
+    this.scene.restart({ levelIndex: this.levelIndex });
+  }
+
+  // R-key-only wrapper around retryLevel(): a bare keypress has no button-press visual
+  // of its own, so this gives it one -- a faint full-screen overlay that fades out --
+  // before the scene actually restarts. resumeGame() is called up front (rather than
+  // left to retryLevel()) because both the tween and this.time.delayedCall below need
+  // this.time/tweens unpaused to actually run if R was pressed from the pause menu.
+  retryLevelWithFlash() {
+    if (this.gameEnded) return;
+    this.resumeGame();
+    // scrollFactor(0) + world-space (0,0) origin, same trick EndScreen/PauseMenu use
+    // for their overlays, keeps this pinned to the viewport regardless of camera
+    // scroll. Depth 150 sits above the HUD (99-100) but below the pause modal (1000)
+    // and end screen (200) -- not that either can be showing here, since gameEnded
+    // and the pause-menu path above already rule those out.
+    const flash = this.add.rectangle(0, 0, 1280, 720, this.levelData.backgroundColor, RETRY_FLASH_ALPHA)
+      .setOrigin(0).setScrollFactor(0).setDepth(150);
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: RETRY_FLASH_DURATION_MS,
+      onComplete: () => flash.destroy(),
+    });
+    this.time.delayedCall(RETRY_FLASH_DURATION_MS, () => this.retryLevel());
   }
 
   hitEnemy(bullet, enemy) {
@@ -391,7 +501,9 @@ export class GameScene extends Phaser.Scene {
   fireBeamWeapon(player, pointer, chargeRatio = 1) {
     const weapon = player.weapon;
     const damage = weapon.damage * chargeRatio;
-    const aimAngle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
+    const originX = player.weaponSprite.x;
+    const originY = player.weaponSprite.y;
+    const aimAngle = Phaser.Math.Angle.Between(originX, originY, pointer.worldX, pointer.worldY);
     const angle = applyWeaponSpread(weapon, aimAngle);
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
@@ -405,7 +517,7 @@ export class GameScene extends Phaser.Scene {
     [this.platformsNormal, this.platformsEnemyPassthrough].forEach((group) => {
       group.children.iterate((platform) => {
         if (!platform || !platform.active) return;
-        const t = this.raycastRect(player.x, player.y, dx, dy, platform.body);
+        const t = this.raycastRect(originX, originY, dx, dy, platform.body);
         if (t !== null && t < beamLength) beamLength = t;
       });
     });
@@ -417,9 +529,9 @@ export class GameScene extends Phaser.Scene {
     // and cause the next platform to be skipped.
     this.platformsBreakable.getChildren().slice().forEach((platform) => {
       if (!platform || !platform.active) return;
-      const t = this.raycastRect(player.x, player.y, dx, dy, platform.body);
+      const t = this.raycastRect(originX, originY, dx, dy, platform.body);
       if (t !== null && t <= beamLength) {
-        this.damagePlatformAtPoint(player.x + dx * t, player.y + dy * t, platform, damage, BULLET_PLAYER_TINT);
+        this.damagePlatformAtPoint(originX + dx * t, originY + dy * t, platform, damage, BULLET_PLAYER_TINT);
       }
     });
 
@@ -428,13 +540,13 @@ export class GameScene extends Phaser.Scene {
     // this.enemies mid-loop and would skip whichever enemy shifts into its slot.
     this.enemies.getChildren().slice().forEach((enemy) => {
       if (!enemy || !enemy.active) return;
-      const t = this.raycastRect(player.x, player.y, dx, dy, enemy.body);
+      const t = this.raycastRect(originX, originY, dx, dy, enemy.body);
       if (t !== null && t <= beamLength) {
         this.hitEnemyWithBeam(enemy, damage, angle, chargeRatio);
       }
     });
 
-    this.spawnBeamEffect(player.x, player.y, angle, beamLength, weapon.beamWidth || 6, chargeRatio);
+    this.spawnBeamEffect(originX, originY, angle, beamLength, weapon.beamWidth || 6, chargeRatio);
 
     if (weapon.recoil) {
       const recoilVec = new Phaser.Math.Vector2();
@@ -525,6 +637,40 @@ export class GameScene extends Phaser.Scene {
     this.damagePlatformAtPoint(x, y, platform, damage, tint);
   }
 
+  // Called right after a player bullet is created (see Player.fireWeapon), in case its
+  // spawn point -- now the weapon sprite's tip, not the player's own center -- is
+  // already inside a platform that would normally destroy it on contact. A bullet that
+  // spawns fully embedded like that can't be counted on to trigger Arcade's own
+  // collider/overlap the instant it appears (and if it's aimed straight into the wall,
+  // it may never separate out on its own), so this checks its exact spawn point up
+  // front and applies the same "hit" behavior a normal collision would have -- damaging
+  // a breakable platform, or exploding/destroying against a normal/enemyPassthrough one.
+  // A no-op if the spawn point isn't inside any of those (the overwhelmingly common
+  // case). Bounceable is deliberately excluded -- bullets rebound off it rather than
+  // being destroyed, so there's nothing to resolve early there.
+  resolveBulletSpawnInWall(bullet, tint = BULLET_PLAYER_TINT) {
+    if (!bullet.active) return;
+
+    const bodies = this.physics.overlapRect(bullet.x, bullet.y, 1, 1, false, true);
+    const objects = bodies.map((body) => body.gameObject);
+
+    // Breakable checked first, same priority as the registered overlap order above --
+    // a spawn point simultaneously touching a breakable and a normal/enemyPassthrough
+    // platform at a seam should still damage the breakable rather than just vanish.
+    const breakable = objects.find((obj) => obj && obj.active && this.platformsBreakable.contains(obj));
+    if (breakable) {
+      this.damagePlatform(bullet, breakable, bullet.damage !== undefined ? bullet.damage : 1, tint);
+      return;
+    }
+
+    const solid = objects.find((obj) => obj && obj.active && (this.platformsNormal.contains(obj) || this.platformsEnemyPassthrough.contains(obj)));
+    if (solid) {
+      this.explodeBullet(bullet, solid, tint);
+      spawnBulletBreakParticles(this, bullet.x, bullet.y, tint);
+      bullet.destroy();
+    }
+  }
+
   // The actual "take damage, flash, break particles, maybe destroy" logic for a
   // breakable platform, split out from damagePlatform() above so the beam weapon
   // (which has no bullet object -- it's a hitscan, not a travelling projectile) can
@@ -544,7 +690,10 @@ export class GameScene extends Phaser.Scene {
       if (platform.active) platform.setTint(platform.baseTint);
     });
     if (platform.health <= 0) {
+      spawnPlatformBreakParticles(this, platform.x, platform.y);
       platform.destroy();
+    } else {
+      spawnPlatformHitParticles(this, x, y);
     }
   }
 
@@ -627,10 +776,17 @@ export class GameScene extends Phaser.Scene {
       this.physics.world.timeScale = 1 / scale;
       this.time.timeScale = scale;
       this.tweens.timeScale = scale;
+      this.anims.globalTimeScale = scale;
     }
 
     // --- bullet-time-scaled delta, used for all charge/dash/cooldown timing ---
     const scaledDelta = delta * this.time.timeScale;
+
+    // --- parallax background: sprite itself stays pinned to the screen (scrollFactor
+    // 0), so the "camera factor" effect is faked by shifting the tile pattern by
+    // scroll * factor each frame instead of moving the sprite ---
+    this.background.tilePositionX = this.cameras.main.scrollX * this.backgroundScrollFactor;
+    this.background.tilePositionY = this.cameras.main.scrollY * this.backgroundScrollFactor;
 
     // --- down-hold state, used by the one-way platform process callback ---
     this.downHeld = this.cursors.down.isDown || this.keys.S.isDown;

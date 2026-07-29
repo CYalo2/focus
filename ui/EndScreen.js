@@ -17,6 +17,21 @@ function formatTime(ms) {
 // timeMs and isNewBest are optional and only ever displayed when won is true -- callers
 // on the lose path (GameScene.loseLevel) simply omit them.
 export function showEndScreen(scene, title, color, won, timeMs, isNewBest) {
+  // Freeze sprite animation cycles and tweens once the overlay goes up. winLevel()/
+  // loseLevel() already call physics.pause() before this runs, which stops velocity-
+  // driven motion, but player/enemy walk & idle anims and tweens (hit-flash, goal-
+  // activation glow) are driven independently of physics and would otherwise keep
+  // playing behind the overlay. Particle emitters are deliberately left alone -- bullet
+  // break/bounce and enemy death bursts read fine finishing out on their own. Scoped to
+  // this scene's own TweenManager and its top-level children only -- not the global
+  // anim manager -- so it can't bleed into other scenes. No explicit resume is needed:
+  // RETRY/NEXT LEVEL/menu all route through scene.restart() or scene.start(), which
+  // tear this scene down and rebuild it from scratch.
+  scene.tweens.pauseAll();
+  scene.children.list.forEach((child) => {
+    if (child.anims && child.anims.isPlaying) child.anims.pause();
+  });
+
   const overlay = scene.add.rectangle(0, 0, 1280, 720, 0x000000, 0.6).setOrigin(0).setScrollFactor(0);
   const titleText = scene.add.text(640, 280, title, { fontSize: '48px', color }).setOrigin(0.5).setScrollFactor(0);
 
@@ -94,4 +109,10 @@ export function showEndScreen(scene, title, color, won, timeMs, isNewBest) {
       retryAction();
     }
   });
+
+  // R always mirrors the RETRY button specifically (unlike space, which prefers
+  // NEXT LEVEL when available) -- retry is present on every end screen, win or
+  // lose, so this binding doesn't need a hasNext check. `once` for the same
+  // reason as the space listener: avoid a held/repeated key firing restart twice.
+  scene.input.keyboard.once('keydown-R', retryAction);
 }

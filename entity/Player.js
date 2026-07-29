@@ -1,5 +1,15 @@
-import { PLAYER_STATS, GRAVITY, DASH, CHARGING_TINT, CHARGE_READY_TINT, CHARGE_MIN_OPACITY, DEPTH } from "../data/Constants.js";
-import { WEAPON_FIRE_MODE, applyWeaponSpread } from "../data/Weapons.js";
+import {
+  PLAYER_STATS,
+  GRAVITY,
+  DASH,
+  PLAYER_BUSY_TINT,
+  CHARGE_MIN_OPACITY,
+  WEAPON_DISPLAY_DISTANCE,
+  WEAPON_FLASH_TINT,
+  WEAPON_FLASH_INTERVAL_MS,
+  DEPTH,
+} from "../data/Constants.js";
+import { WEAPONS, WEAPON_FIRE_MODE, applyWeaponSpread } from "../data/Weapons.js";
 import { createBullet } from "./Bullet.js";
 import { spawnDashParticles } from "../fx/Particles.js";
 
@@ -8,11 +18,30 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     super(scene, x, y, 'player');
     scene.add.existing(this);
     scene.physics.add.existing(this);
+    this.setScale(2);
 
     this.weapon = weapon;
+    // The animation keys for the weapon display sprite (below) are named after
+    // whatever key this weapon is registered under in WEAPONS (e.g. "default" ->
+    // default_weapon_idle/_charge/_ready), so this just reverse-looks-up that key
+    // from the object identity, rather than requiring WEAPONS entries to redundantly
+    // carry their own key as a field too.
+    this.weaponName = Object.keys(WEAPONS).find((key) => WEAPONS[key] === weapon);
+
     this.setCollideWorldBounds(true);
     this.setDragX(PLAYER_STATS.drag);
     this.setDepth(DEPTH.player);
+
+    this.play("player_idle");
+
+    // Weapon display: a separate sprite orbiting the player at a fixed radius,
+    // always rotated to face the mouse (see updateWeaponDisplay()) -- fireWeapon()
+    // below also spawns bullets from this sprite's position rather than the
+    // player's, so shots visibly originate from the weapon itself.
+    this.weaponSprite = scene.add.sprite(x, y, 'player');
+    this.weaponSprite.setScale(2);
+    this.weaponSprite.setDepth(DEPTH.weapon);
+    this.weaponSprite.play(`${this.weaponName}_weapon_idle`);
 
     this.facing = 1; // 1 = right, -1 = left
 
@@ -56,7 +85,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     const aimAngle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
     const angle = applyWeaponSpread(this.weapon, aimAngle);
-    const bullet = createBullet(this.scene, bulletGroup, 'bulletPlayer', this.x, this.y, angle, this.weapon.projectileSpeed);
+
+    // Normally bullets spawn at the weapon sprite's tip -- but a bounceable platform is
+    // the one case resolveBulletSpawnInWall() below deliberately leaves alone (bullets
+    // rebound off it rather than being destroyed), so a shot fired with the weapon tip
+    // stuck inside one would otherwise just get stuck bouncing in place. Falling back to
+    // the player's own center avoids that without needing bounce logic to special-case
+    // an embedded spawn.
+    let spawnX = this.weaponSprite.x;
+    let spawnY = this.weaponSprite.y;
+    const bodiesAtWeaponTip = this.scene.physics.overlapRect(spawnX, spawnY, 1, 1, false, true);
+    if (bodiesAtWeaponTip.some((body) => body.gameObject && this.scene.platformsBounceable.contains(body.gameObject))) {
+      spawnX = this.x;
+      spawnY = this.y;
+    }
+
+    const bullet = createBullet(this.scene, bulletGroup, 'bulletPlayer', spawnX, spawnY, angle, this.weapon.projectileSpeed);
     bullet.damage = this.weapon.damage * chargeRatio;
     bullet.explodesOnHit = !!this.weapon.explodesOnHit;
     bullet.explosionRadius = this.weapon.explosionRadius || 0;
@@ -69,10 +113,50 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // covers every weapon that doesn't define minChargeMs.
     bullet.setAlpha(CHARGE_MIN_OPACITY + (1 - CHARGE_MIN_OPACITY) * chargeRatio);
 
+    // Catches the case where the weapon sprite's tip is itself inside a wall when it
+    // fires -- see GameScene.resolveBulletSpawnInWall() for why that needs an explicit
+    // check rather than relying on Arcade's own collider/overlap to catch it.
+    this.scene.resolveBulletSpawnInWall(bullet);
+
     if (this.weapon.recoil) {
       const recoilVec = new Phaser.Math.Vector2();
       this.scene.physics.velocityFromRotation(angle, -this.weapon.recoil, recoilVec);
       this.setVelocity(this.body.velocity.x + recoilVec.x, this.body.velocity.y + recoilVec.y);
+    }
+  }
+
+  // Keeps the weapon display sprite orbiting the player at WEAPON_DISPLAY_DISTANCE,
+  // always rotated to face the mouse, and picks its animation for the current
+  // fire-mode/charge/cooldown state -- `${weaponName}_weapon_idle/_charge/_ready` for
+  // CHARGE-mode weapons, `${weaponName}_weapon_idle/_cooldown` for COOLDOWN-mode ones.
+  // Also flashes the sprite yellow (alternating with its normal look) while a
+  // CHARGE-mode weapon is held at full charge, so "ready to fire" reads clearly on the
+  // weapon itself rather than only via the player's tint.
+  updateWeaponDisplay(time, pointer) {
+    const aimAngle = Phaser.Math.Angle.Between(this.x, this.y, pointer.worldX, pointer.worldY);
+    this.weaponSprite.rotation = aimAngle;
+    this.weaponSprite.x = this.x + Math.cos(aimAngle) * WEAPON_DISPLAY_DISTANCE;
+    this.weaponSprite.y = this.y + Math.sin(aimAngle) * WEAPON_DISPLAY_DISTANCE;
+
+    const isCooldownWeapon = (this.weapon.fireMode || WEAPON_FIRE_MODE.CHARGE) === WEAPON_FIRE_MODE.COOLDOWN;
+    const fullyCharged = !isCooldownWeapon && this.isCharging && this.chargeElapsedMs >= this.weapon.chargeTimeMs;
+
+    if (isCooldownWeapon) {
+      this.weaponSprite.play(this.isOnCooldown ? `${this.weaponName}_weapon_cooldown` : `${this.weaponName}_weapon_idle`, true);
+    } else if (fullyCharged) {
+      this.weaponSprite.play(`${this.weaponName}_weapon_ready`, true);
+    } else if (this.isCharging) {
+      this.weaponSprite.play(`${this.weaponName}_weapon_charge`, true);
+    } else {
+      this.weaponSprite.play(`${this.weaponName}_weapon_idle`, true);
+    }
+
+    if (fullyCharged) {
+      const flashOn = Math.floor(time / WEAPON_FLASH_INTERVAL_MS) % 2 === 0;
+      if (flashOn) this.weaponSprite.setTint(WEAPON_FLASH_TINT);
+      else this.weaponSprite.clearTint();
+    } else {
+      this.weaponSprite.clearTint();
     }
   }
 
@@ -382,16 +466,19 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       }
     }
 
-    // --- weapon-busy visual indicator: charging shows two stages (charging, then
-    // charge-ready); cooldown mode just shows the "busy" tint for its whole duration,
-    // since there's no ready/not-ready distinction to show ---
-    if (this.isCharging) {
-      this.setTint(this.chargeElapsedMs >= this.weapon.chargeTimeMs ? CHARGE_READY_TINT : CHARGING_TINT);
-    } else if (this.isOnCooldown) {
-      this.setTint(CHARGING_TINT);
+    // --- weapon-busy visual indicator: a single, very slight shade applied for
+    // charging, fully-charged, and cooldown alike (previously three different tint
+    // colors) -- the weapon sprite's own animation/flash below is what now carries
+    // the distinction between those states. ---
+    if (this.isCharging || this.isOnCooldown) {
+      this.setTint(PLAYER_BUSY_TINT);
     } else {
       this.clearTint();
     }
+
+    this.updateWeaponDisplay(time, pointer);
+
+    let moved = false;
 
     // --- movement (reads real input each frame, unaffected by timeScale) ---
     if (!this.isDashing && this.lockRemainingMs <= 0) {
@@ -403,13 +490,52 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       const firingPenaltyActive = this.isCharging || this.isOnCooldown;
       const speedMult = firingPenaltyActive ? this.weapon.moveSpeedMultiplier : 1;
       const jumpMult = firingPenaltyActive ? this.weapon.jumpMultiplier : 1;
+      moved = left || right;
 
-      if (left) { this.setVelocityX(-PLAYER_STATS.moveSpeed * speedMult); this.facing = -1; }
-      else if (right) { this.setVelocityX(PLAYER_STATS.moveSpeed * speedMult); this.facing = 1; }
+      if (left) {
+        this.setVelocityX(-PLAYER_STATS.moveSpeed * speedMult); this.facing = -1;
+      }
+      else if (right) {
+        this.setVelocityX(PLAYER_STATS.moveSpeed * speedMult); this.facing = 1;
+      }
 
       if (jump && this.body.blocked.down) {
         this.setVelocityY(-PLAYER_STATS.jumpVelocity * jumpMult);
       }
     }
+
+    if (this.dashCooldownRemainingMs == 0) {
+      if (!this.body.blocked.down) {
+        if (this.body.velocity.y < 0) {
+          this.play("player_rise", true);
+        } else {
+          this.play("player_fall", true);
+        }
+      } else if (moved) {
+        this.play("player_run", true);
+      } else {
+        this.play("player_idle", true);
+      }
+    } else {
+      if (!this.body.blocked.down) {
+        if (this.body.velocity.y < 0) {
+          this.play("player_rise_c", true);
+        } else {
+          this.play("player_fall_c", true);
+        }
+      } else if (moved) {
+        this.play("player_run_c", true);
+      } else {
+        this.play("player_idle_c", true);
+      }
+    }
+    
+
+    this.setFlipX(this.facing === -1);
+  }
+
+  destroy(fromScene) {
+    if (this.weaponSprite) this.weaponSprite.destroy();
+    super.destroy(fromScene);
   }
 }

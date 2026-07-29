@@ -1,4 +1,4 @@
-import { DEPTH, ENEMY_BASE_TINT, GOAL_BASE_TINT, PLAYER_BASE_TINT } from "../data/Constants.js";
+import { DEPTH, ENEMY_BASE_TINT, GOAL_BASE_TINT, PLAYER_DASH_PARTICLES } from "../data/Constants.js";
 
 // All three effects use the plain white 'particle' texture from BootScene and tint it
 // per-call -- tinting white with any color gives back that exact color (unlike tinting
@@ -79,7 +79,7 @@ export function spawnDashParticles(scene, x, y) {
     speed: { min: 40, max: 120 },
     scale: { start: 0.5, end: 0 },
     alpha: { start: 0.8, end: 0 },
-    tint: PLAYER_BASE_TINT,
+    tint: PLAYER_DASH_PARTICLES,
     quantity: 8,
     emitting: false,
   });
@@ -87,6 +87,44 @@ export function spawnDashParticles(scene, x, y) {
   syncToBulletTime(scene, emitter);
   emitter.explode(8);
   scene.time.delayedCall(250, () => emitter.destroy());
+}
+
+// Tiny burst for a breakable platform taking a hit but surviving -- much smaller than
+// the break burst below, just a little visual tap to sell the impact landed.
+const BREAKABLE_PLATFORM_TINT = 0x999999;
+
+export function spawnPlatformHitParticles(scene, x, y) {
+  const emitter = scene.add.particles(x, y, 'particle', {
+    lifespan: 180,
+    speed: { min: 30, max: 90 },
+    scale: { start: 0.4, end: 0 },
+    alpha: { start: 0.8, end: 0 },
+    tint: BREAKABLE_PLATFORM_TINT,
+    quantity: 5,
+    emitting: false,
+  });
+  emitter.setDepth(DEPTH.explosion);
+  syncToBulletTime(scene, emitter);
+  emitter.explode(5);
+  scene.time.delayedCall(230, () => emitter.destroy());
+}
+
+// Bigger burst for a breakable platform actually breaking apart -- call this once,
+// where the platform is destroyed, not on every hit leading up to it.
+export function spawnPlatformBreakParticles(scene, x, y) {
+  const emitter = scene.add.particles(x, y, 'particle', {
+    lifespan: 400,
+    speed: { min: 60, max: 200 },
+    scale: { start: 0.8, end: 0 },
+    alpha: { start: 1, end: 0 },
+    tint: BREAKABLE_PLATFORM_TINT,
+    quantity: 18,
+    emitting: false,
+  });
+  emitter.setDepth(DEPTH.explosion);
+  syncToBulletTime(scene, emitter);
+  emitter.explode(18);
+  scene.time.delayedCall(450, () => emitter.destroy());
 }
 
 // Ambient sparkle on the goal for a limited window after the last enemy is cleared,

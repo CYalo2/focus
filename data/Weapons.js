@@ -38,10 +38,9 @@ export function applyWeaponSpread(weapon, baseAngle) {
 
 export const WEAPONS = {
     default: {
-        name: "Default",
         fireMode: WEAPON_FIRE_MODE.CHARGE,
         chargeTimeMs: 300,
-        minChargeMs: 100,
+        minChargeMs: 200,
         moveSpeedMultiplier: 0.5,
         jumpMultiplier: 0.5,
         projectileSpeed: 900,
@@ -58,7 +57,6 @@ export const WEAPONS = {
     // breakables. beamWidth is purely visual (the drawn rectangle's thickness);
     // beamRange caps how far it can reach if nothing stops it first.
     beam: {
-        name: "Beam",
         fireMode: WEAPON_FIRE_MODE.CHARGE,
         chargeTimeMs: 500,
         moveSpeedMultiplier: 0.8,
@@ -77,7 +75,6 @@ export const WEAPONS = {
     // not when it bounces off a bounceable platform, and not when it's cleaned up
     // for going offscreen.
     blaster: {
-        name: "Blaster",
         fireMode: WEAPON_FIRE_MODE.COOLDOWN,
         cooldownMs: 700,
         moveSpeedMultiplier: 0.4,
