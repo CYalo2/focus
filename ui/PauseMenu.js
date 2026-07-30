@@ -85,7 +85,7 @@ function buildPauseModal(scene, bestTimeMs, completed) {
   });
   levelSelectButton.on("pointerdown", () => {
     scene.resumeGame();
-    scene.scene.start("LevelSelectScene");
+    scene.scene.start("LevelSelectScene", { focusLevelIndex: scene.levelIndex });
   });
 
   resumeButton.on("pointerover", () => resumeButton.setColor("#ffffff"));

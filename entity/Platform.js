@@ -75,6 +75,14 @@ const BORDER_WIDTH = 2;
 // platforms use the raw 'tile' texture (no flat base color to darken).
 const BORDER_DARKEN_ALPHA = 0.35;
 
+// Color/alpha for the separate outline pass drawn around bounceable
+// platforms (see bounceOutlineCandidates below) -- a pale green instead of
+// the darkened-black look used for OUTLINE_PLATFORM_TYPES, so bounceable
+// edges read as their own distinct thing rather than reusing the "shared
+// darken" language of normal platform outlines.
+const BOUNCE_OUTLINE_COLOR = 0x98fb98;
+const BOUNCE_OUTLINE_ALPHA = 0.2;
+
 // Builds a oneway platform as a tinted 'platform' top/bottom frame around an
 // interior filled with 'background_tile', tinted to match the level's background
 // (see GameScene's this.background.setTint call), instead of one flat tinted
@@ -140,17 +148,19 @@ function subtractCoveredRanges(start, end, coveredRanges) {
   return segments.filter(([s, e]) => e - s > 0.01);
 }
 
-// Draws a darkened outline around the exposed edges of `platforms` (each
-// {left, top, right, bottom}). Where two platforms in the list share an edge
-// (one's right lines up with another's left, etc, with overlapping range on
-// the perpendicular axis), that shared portion is treated as interior -- no
-// border is drawn there -- so a contiguous cluster of platforms reads as one
-// shape with a single outline around its outside, rather than each platform
-// getting its own fully-boxed border.
-function drawPlatformOutlines(scene, platforms) {
+// Draws an outline (color/alpha configurable, defaulting to the darkened-black
+// look) around the exposed edges of `platforms` (each {left, top, right,
+// bottom}). Where two platforms in the list share an edge (one's right lines
+// up with another's left, etc, with overlapping range on the perpendicular
+// axis), that shared portion is treated as interior -- no border is drawn
+// there -- so a contiguous cluster of platforms reads as one shape with a
+// single outline around its outside, rather than each platform getting its
+// own fully-boxed border. Called once for OUTLINE_PLATFORM_TYPES and again,
+// separately, for bounceable platforms with a pale green color/alpha.
+function drawPlatformOutlines(scene, platforms, color = 0x000000, alpha = BORDER_DARKEN_ALPHA) {
   const graphics = scene.add.graphics();
   graphics.setDepth(DEPTH.platform + 1);
-  graphics.fillStyle(0x000000, BORDER_DARKEN_ALPHA);
+  graphics.fillStyle(color, alpha);
 
   platforms.forEach(p => {
     const touchingAbove = platforms
@@ -205,6 +215,13 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
   // candidate at once to know which edges are shared vs exposed.
   const outlineCandidates = [];
 
+  // Geometry for every 'bounceable' platform, collected the same way as
+  // outlineCandidates above but kept separate since it feeds its own,
+  // independently-colored (pale green) outline pass -- see
+  // BOUNCE_OUTLINE_COLOR/BOUNCE_OUTLINE_ALPHA and the drawPlatformOutlines
+  // call below.
+  const bounceOutlineCandidates = [];
+
   levelPlatforms.forEach(p => {
     const type = p.type || 'normal';
     const typeDefaults = PLATFORM_TYPES[type];
@@ -222,9 +239,12 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
     // `inner`) -- lightenColor(levelBackgroundColor, 0.5). 'enemyPassthrough' gets
     // that same lightenColor(..., 0.5) treatment, but starting from BULLET_ENEMY_TINT
     // instead of the background color, so it reads as the enemy-flavored version of
-    // the same see-through surface. Every other type keeps the old 'platform'
-    // texture + type tint.
-    const BLEND_TEXTURES = { normal: 'tile', breakable: 'breakable_tile', bulletPassthrough: 'background_tile', enemyPassthrough: 'tile' };
+    // the same see-through surface. 'bounceable' gets the same blend/untinted
+    // treatment as 'normal' (same alignTileSprite call below applies to it too), just
+    // with its own 'bounce_tile' texture instead of 'tile', so it reads as its own
+    // distinct surface without a flat tint washing it out. Every other type keeps the
+    // old 'platform' texture + type tint.
+    const BLEND_TEXTURES = { normal: 'tile', breakable: 'breakable_tile', bulletPassthrough: 'background_tile', enemyPassthrough: 'tile', bounceable: 'bounce_tile' };
     const isBlendPlatform = type in BLEND_TEXTURES;
     const rect = scene.add.tileSprite(cx, cy, w, h, isBlendPlatform ? BLEND_TEXTURES[type] : 'platform');
     rect.setDepth(DEPTH.platform);
@@ -236,6 +256,10 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
 
     if (OUTLINE_PLATFORM_TYPES.includes(type)) {
       outlineCandidates.push({ left, top, right: left + w, bottom: top + h });
+    }
+
+    if (type === 'bounceable') {
+      bounceOutlineCandidates.push({ left, top, right: left + w, bottom: top + h });
     }
 
     if (!isBlendPlatform) {
@@ -283,6 +307,7 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
   });
 
   const platformOutlines = drawPlatformOutlines(scene, outlineCandidates);
+  const platformBounceOutlines = drawPlatformOutlines(scene, bounceOutlineCandidates, BOUNCE_OUTLINE_COLOR, BOUNCE_OUTLINE_ALPHA);
 
   return {
     platformsNormal,
@@ -294,5 +319,6 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
     platformsDeath,
     platformsRedirect,
     platformOutlines,
+    platformBounceOutlines,
   };
 }

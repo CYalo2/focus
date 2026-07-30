@@ -215,7 +215,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       // equivalent instead shows the same circle continuously while held at full
       // charge (see GameScene.update()), since a cooldown weapon has no held state
       // to linger on.
-      this.scene.spawnFireReadyIndicator(pointer.worldX, pointer.worldY);
+      this.scene.spawnFireReadyIndicator(pointer.x, pointer.y);
       this.cooldownRemainingMs = this.weapon.cooldownMs;
       this.isOnCooldown = true;
     }

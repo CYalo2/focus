@@ -21,7 +21,6 @@ export const PLATFORM_TYPES = {
 };
 
 export const PLATFORM_TINTS = {
-    bounceable: 0x008400,
     death: 0xcd2121,
     redirect: 0x640280,
 };

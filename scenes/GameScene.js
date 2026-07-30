@@ -60,8 +60,12 @@ const FIRE_READY_INDICATOR_LINE_WIDTH = 3;
 // so both stay visually identical. Built from a Graphics object (rather than the
 // Circle game object the ring version used) since a plus shape isn't one of Phaser's
 // built-in primitives.
+// (x, y) here are always SCREEN coordinates (pointer.x/pointer.y), not world
+// coordinates -- this marker only ever needs to sit on top of the actual cursor, so
+// scrollFactor(0) pins it to the screen directly and it never has to track the
+// camera or worry about stale worldX/worldY.
 function drawFireReadyRing(scene, x, y) {
-  const g = scene.add.graphics({ x, y });
+  const g = scene.add.graphics({ x, y }).setScrollFactor(0);
   g.lineStyle(FIRE_READY_INDICATOR_LINE_WIDTH, FIRE_READY_INDICATOR_COLOR, FIRE_READY_INDICATOR_ALPHA);
   g.beginPath();
   g.moveTo(-FIRE_READY_INDICATOR_SIZE, 0);
@@ -313,12 +317,19 @@ export class GameScene extends Phaser.Scene {
     // isPaused is true (which is what actually freezes gameplay).
     this.input.keyboard.on("keydown-E", () => this.togglePause());
     // Same reasoning for R -- bound via the keyboard event rather than polled, so it
-    // still fires a quick retry even while paused (retryLevel() resumes first before
-    // restarting), not just during live gameplay. Unlike the HUD/pause-menu retry
-    // buttons (which call retryLevel() directly with no feedback of their own), this
-    // is a bare keypress with nothing visible under the cursor to confirm it landed --
-    // so this handler gives it its own brief camera flash first, then restarts.
-    this.input.keyboard.on("keydown-R", () => this.retryLevelWithFlash());
+    // still fires a quick retry even while paused, not just during live gameplay.
+    // During live gameplay a bare keypress has nothing visible under the cursor to
+    // confirm it landed, so retryLevelWithFlash() gives it its own brief camera flash
+    // first. While paused, the pause menu is already up (and its own RESTART button
+    // retries instantly, no flash) -- so R mirrors that instead of adding a flash on
+    // top of a screen that's already telling you the game is paused.
+    this.input.keyboard.on("keydown-R", () => {
+      if (this.isPaused) {
+        this.retryLevel();
+      } else {
+        this.retryLevelWithFlash();
+      }
+    });
   }
 
   togglePause() {
@@ -366,23 +377,26 @@ export class GameScene extends Phaser.Scene {
     this.anims.resumeAll();
   }
 
-  // Quick retry, callable from anywhere (R key, the HUD's retry button) without going
-  // through the pause menu. No retrying over the win/lose screen, same as togglePause().
-  // resumeGame() first (a no-op if we weren't paused) for the same reason PauseMenu's
-  // restart button calls it before scene.restart() -- it's what clears this.time.paused,
-  // which otherwise survives into the next scene instance and leaves every delayedCall
-  // the new level schedules (hit-flash clears, platform damage-flash clears) never firing.
+  // Quick retry, callable from anywhere (R key while paused, the HUD's retry button,
+  // PauseMenu's RESTART button) without any flash of its own -- there's already
+  // something on screen confirming the press landed in all three cases (the pause
+  // menu, or the button itself). No retrying over the win/lose screen, same as
+  // togglePause(). resumeGame() first (a no-op if we weren't paused) for the same
+  // reason PauseMenu's restart button calls it before scene.restart() -- it's what
+  // clears this.time.paused, which otherwise survives into the next scene instance
+  // and leaves every delayedCall the new level schedules (hit-flash clears, platform
+  // damage-flash clears) never firing.
   retryLevel() {
     if (this.gameEnded) return;
     this.resumeGame();
     this.scene.restart({ levelIndex: this.levelIndex });
   }
 
-  // R-key-only wrapper around retryLevel(): a bare keypress has no button-press visual
-  // of its own, so this gives it one -- a faint full-screen overlay that fades out --
-  // before the scene actually restarts. resumeGame() is called up front (rather than
-  // left to retryLevel()) because both the tween and this.time.delayedCall below need
-  // this.time/tweens unpaused to actually run if R was pressed from the pause menu.
+  // R-key wrapper around retryLevel() for the live-gameplay case: a bare keypress has
+  // no button-press visual of its own, so this gives it one -- a faint full-screen
+  // overlay that fades out -- before the scene actually restarts. Only reached while
+  // not paused (see the keydown-R handler above); resumeGame() below is a no-op in
+  // that case, kept only as a harmless backstop.
   retryLevelWithFlash() {
     if (this.gameEnded) return;
     this.resumeGame();
@@ -791,6 +805,15 @@ export class GameScene extends Phaser.Scene {
     // --- down-hold state, used by the one-way platform process callback ---
     this.downHeld = this.cursors.down.isDown || this.keys.S.isDown;
 
+    // Phaser only recalculates pointer.worldX/worldY when the pointer itself emits an
+    // event (move/down/up/wheel) -- panning or otherwise moving the camera doesn't
+    // trigger that, so if the mouse sits still while the camera scrolls, worldX/worldY
+    // stay stuck at the pre-scroll value. Everything downstream (weapon aim in
+    // Player.js, fireBeamWeapon, the charge-ready indicator below) reads worldX/worldY
+    // assuming it reflects "wherever the cursor currently is", so it needs refreshing
+    // against the current camera transform once per frame, before any of that runs.
+    this.input.activePointer.updateWorldPoint(this.cameras.main);
+
     // --- delegate all player input/movement/dash/charge handling to the Player entity ---
     this.player.update(time, delta, scaledDelta, {
       cursors: this.cursors,
@@ -809,7 +832,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.chargeReadyIndicator) {
         this.chargeReadyIndicator = drawFireReadyRing(this, 0, 0);
       }
-      this.chargeReadyIndicator.setPosition(this.input.activePointer.worldX, this.input.activePointer.worldY);
+      this.chargeReadyIndicator.setPosition(this.input.activePointer.x, this.input.activePointer.y);
     } else if (this.chargeReadyIndicator) {
       this.chargeReadyIndicator.destroy();
       this.chargeReadyIndicator = null;

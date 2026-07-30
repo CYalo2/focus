@@ -16,6 +16,7 @@ export class BootScene extends Phaser.Scene {
         this.load.image("tile", "assets/tile/tile.png");
         this.load.image("background_tile", "assets/tile/background_tile.png");
         this.load.image("breakable_tile", "assets/tile/breakable_tile.png");
+        this.load.image("bounce_tile", "assets/tile/bounce_tile.png");
     }
     
     create() {

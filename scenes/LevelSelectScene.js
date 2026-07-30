@@ -15,7 +15,7 @@ export class LevelSelectScene extends Phaser.Scene {
         super("LevelSelectScene");
     }
 
-    create() {
+    create(data) {
 
         const { width } = this.scale;
 
@@ -28,6 +28,20 @@ export class LevelSelectScene extends Phaser.Scene {
         // the player back to that page if they've already navigated away from it
         // (e.g. paged forward while the initial completion data was still loading).
         this.hasNavigated = false;
+
+        // Arriving here via "back to level select" (PauseMenu / EndScreen) passes the
+        // level to land on, so the player is dropped back on the page they came from
+        // instead of wherever refreshProgress() would otherwise send them. Clamped to
+        // a valid level index (in case that level was the last one, e.g. exactly 12
+        // levels filling out the final page evenly) and marked as "navigated" so
+        // refreshProgress() -- which only jumps to the furthest-unlocked page while
+        // hasNavigated is still false -- doesn't overwrite it once completion data
+        // finishes loading.
+        if (Number.isInteger(data?.focusLevelIndex)) {
+            const focusIndex = Phaser.Math.Clamp(data.focusLevelIndex, 0, LEVELS.length - 1);
+            this.page = Phaser.Math.Clamp(Math.floor(focusIndex / PAGE_SIZE), 0, this.totalPages - 1);
+            this.hasNavigated = true;
+        }
 
         // Unlock state per level, indexed the same as LEVELS. Starts all-locked
         // (except level 0, handled by isLevelUnlocked) so buildPage() has something

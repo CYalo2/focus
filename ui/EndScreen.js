@@ -86,7 +86,12 @@ export function showEndScreen(scene, title, color, won, timeMs, isNewBest) {
 
   const menu = scene.add.text(640, menuY, 'back to level select', { fontSize: '16px', color: '#888888' })
     .setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
-  menu.on('pointerdown', () => scene.scene.start('LevelSelectScene'));
+  // On a win, land on the next level's page (the one the player's about to unlock) --
+  // except when this was a win on the last level, where hasNext is false and there's
+  // no next level to point at, so fall back to this level's own page instead. On a
+  // loss there's no "next" at all, so it's always just this level's page.
+  const focusLevelIndex = hasNext ? scene.levelIndex + 1 : scene.levelIndex;
+  menu.on('pointerdown', () => scene.scene.start('LevelSelectScene', { focusLevelIndex }));
   children.push(menu);
 
   // Group everything into a single container, same approach as PauseMenu's
