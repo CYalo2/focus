@@ -9,6 +9,7 @@
 
 const SDK_SCRIPT_URL = "https://sdk.crazygames.com/crazygames-sdk-v3.js";
 const STORAGE_KEY = "levelProgress";
+const SETTINGS_KEY = "gameSettings"; // separate record for player prefs (currently just music volume)
 const USE_SDK = false; // flip to true to use the CrazyGames SDK instead of localStorage
 
 let sdkReadyPromise = null;
@@ -56,9 +57,9 @@ async function isOnCrazyGames() {
 // throw in some contexts (private browsing with storage disabled, quota exceeded,
 // sandboxed iframes) -- and at this point there's nowhere further to fall back to, so
 // failures are swallowed rather than left to break the caller.
-function readLocalStorage() {
+function readLocalStorage(key) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
   } catch (err) {
     console.warn("localStorage read failed:", err);
@@ -66,19 +67,22 @@ function readLocalStorage() {
   }
 }
 
-function writeLocalStorage(progress) {
+function writeLocalStorage(key, value) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
     console.warn("localStorage write failed:", err);
   }
 }
 
-async function readProgress() {
+// Generic read/write against whichever backend is active, keyed so both level
+// progress and settings (or anything else added later) can share the same
+// SDK-with-localStorage-fallback path instead of duplicating it per record type.
+async function readStoredValue(key) {
   if (await isOnCrazyGames()) {
     try {
       const sdk = await ensureSdkReady();
-      const raw = await sdk.data.getItem(STORAGE_KEY);
+      const raw = await sdk.data.getItem(key);
       return raw ? JSON.parse(raw) : {};
     } catch (err) {
       // Connection was there a moment ago (isOnCrazyGames just succeeded) but dropped
@@ -86,20 +90,20 @@ async function readProgress() {
       console.warn("CrazyGames read failed, falling back to localStorage:", err);
     }
   }
-  return readLocalStorage();
+  return readLocalStorage(key);
 }
 
-async function writeProgress(progress) {
+async function writeStoredValue(key, value) {
   if (await isOnCrazyGames()) {
     try {
       const sdk = await ensureSdkReady();
-      await sdk.data.setItem(STORAGE_KEY, JSON.stringify(progress));
+      await sdk.data.setItem(key, JSON.stringify(value));
       return;
     } catch (err) {
       console.warn("CrazyGames write failed, falling back to localStorage:", err);
     }
   }
-  writeLocalStorage(progress);
+  writeLocalStorage(key, value);
 }
 
 // Call when the player reaches the goal. Marks the level complete and lowers its
@@ -111,7 +115,7 @@ async function writeProgress(progress) {
 // particular run improved on the stored best -- isNewBest is true both when this run
 // beat a previous time and when there was no previous completion at all.
 export async function recordLevelCompletion(levelIndex, timeMs) {
-  const progress = await readProgress();
+  const progress = await readStoredValue(STORAGE_KEY);
   const key = String(levelIndex);
   const existing = progress[key];
 
@@ -120,19 +124,32 @@ export async function recordLevelCompletion(levelIndex, timeMs) {
   const bestTimeMs = isNewBest ? timeMs : previousBestMs;
 
   progress[key] = { completed: true, bestTimeMs };
-  await writeProgress(progress);
+  await writeStoredValue(STORAGE_KEY, progress);
   return { bestTimeMs, isNewBest };
 }
 
 // Returns the stored best time in ms for a level, or null if it's never been completed.
 export async function getBestTime(levelIndex) {
-  const progress = await readProgress();
+  const progress = await readStoredValue(STORAGE_KEY);
   const entry = progress[String(levelIndex)];
   return entry ? entry.bestTimeMs : null;
 }
 
 // Returns whether a level has ever been completed.
 export async function isLevelComplete(levelIndex) {
-  const progress = await readProgress();
+  const progress = await readStoredValue(STORAGE_KEY);
   return !!progress[String(levelIndex)]?.completed;
+}
+
+// Music volume, stored as a 0-1 fraction. Defaults to full volume (1) the very first
+// time the game runs, before the player has ever touched the pause menu's slider.
+export async function getMusicVolume() {
+  const settings = await readStoredValue(SETTINGS_KEY);
+  return settings.musicVolume !== undefined ? settings.musicVolume : 1;
+}
+
+export async function setMusicVolume(volume) {
+  const settings = await readStoredValue(SETTINGS_KEY);
+  settings.musicVolume = volume;
+  await writeStoredValue(SETTINGS_KEY, settings);
 }

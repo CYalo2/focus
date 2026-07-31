@@ -1,6 +1,7 @@
 import { LEVELS } from "../data/Levels.js";
 import { getBestTime, isLevelComplete } from "../save/SaveManager.js";
 import { formatTime } from "../data/TimeUtils.js";
+import { initAudioManager } from "../save/AudioManager.js";
 
 const COLS = 3;
 const ROWS = 2;
@@ -15,13 +16,26 @@ export class LevelSelectScene extends Phaser.Scene {
         super("LevelSelectScene");
     }
 
-    create(data) {
+    async create(data) {
 
         const { width } = this.scale;
+
+        // No-op if MenuScene already ran it (the normal path) -- kept here too in
+        // case this scene is ever reached first, so volume/mute are still correct.
+        await initAudioManager(this.game);
 
         this.page = 0;
         this.totalPages = Math.max(1, Math.ceil(LEVELS.length / PAGE_SIZE));
         this.modalContainer = null;
+
+        // Starts fresh each time this scene is entered, and is stopped below as soon
+        // as the scene shuts down (i.e. scene.start() moves us to GameScene or back
+        // to MenuScene) -- so it never keeps playing past this screen, and never
+        // double-plays if the player returns here later. Volume here is this track's
+        // own level *relative to* the shared master volume AudioManager controls.
+        this.music = this.sound.add("level_select", { loop: true, volume: 0.5 });
+        this.music.play();
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.music.stop());
 
         // Set once the player uses the arrows -- refreshProgress() only jumps to the
         // "furthest unlocked level" page while this is still false, so it doesn't yank
