@@ -49,23 +49,15 @@ export const WEAPON_MAX_INACCURACY_RAD = 0.3;
 
 export const BULLET_OFFSCREEN_MARGIN = 100;
 
-export const ENEMY_BASE_TINT = 0xe24b4a;
-
 // How long (ms) before an enemy's cooldown ends that it starts showing
 // ENEMY_WARNING_TINT to telegraph an incoming shot -- see Enemy.js's
 // updateThreatTint(), which compares this against shootCooldownRemaining.
-export const ENEMY_WARNING_TIME_MS = 400;
-
-// Shown instead of the enemy's normal appearance while it's within
-// ENEMY_WARNING_TIME_MS of firing (and the player's in range) -- a brighter,
-// more urgent-looking shade than the base red so an incoming shot reads as a
-// distinct warning rather than blending into idle/hit-flash colors.
-export const ENEMY_WARNING_TINT = 0xff7a5c;
+export const ENEMY_WARNING_TIME_MS = 500;
 
 // Shown instead of the enemy's normal appearance while the player is outside
 // this enemy's attack range box (see isPlayerInRange() in Enemy.js) -- a
 // muted, desaturated shade signaling it currently poses no threat.
-export const ENEMY_OUT_OF_RANGE_TINT = 0x8a5a5a;
+export const ENEMY_OUT_OF_RANGE_TINT = 0x999999;
 
 export const BULLET_PLAYER_TINT = 0xffd23a;
 export const BULLET_ENEMY_TINT = 0xff1600;

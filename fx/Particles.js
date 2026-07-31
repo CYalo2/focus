@@ -1,4 +1,4 @@
-import { DEPTH, ENEMY_BASE_TINT, GOAL_BASE_TINT, PLAYER_DASH_PARTICLES } from "../data/Constants.js";
+import { DEPTH, BULLET_ENEMY_TINT, GOAL_BASE_TINT, PLAYER_DASH_PARTICLES } from "../data/Constants.js";
 
 // All three effects use the plain white 'particle' texture from BootScene and tint it
 // per-call -- tinting white with any color gives back that exact color (unlike tinting
@@ -42,7 +42,7 @@ export function spawnEnemyDeathParticles(scene, x, y) {
     speed: { min: 80, max: 220 },
     scale: { start: 1, end: 0 },
     alpha: { start: 1, end: 0 },
-    tint: ENEMY_BASE_TINT,
+    tint: BULLET_ENEMY_TINT,
     quantity: 20,
     emitting: false,
   });

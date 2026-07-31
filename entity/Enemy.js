@@ -1,16 +1,25 @@
 import { ENEMY_TYPES } from "../data/EnemyTypes.js";
-import { ENEMY_MAX_INACCURACY_RAD, ENEMY_BASE_TINT, ENEMY_WARNING_TIME_MS, ENEMY_WARNING_TINT, ENEMY_OUT_OF_RANGE_TINT, HIT_FLASH_BRIGHTEN_AMOUNT, ENEMY_KNOCKBACK_DRAG, DEPTH } from "../data/Constants.js";
+import { ENEMY_MAX_INACCURACY_RAD, ENEMY_WARNING_TIME_MS, ENEMY_OUT_OF_RANGE_TINT, HIT_FLASH_BRIGHTEN_AMOUNT, ENEMY_KNOCKBACK_DRAG, DEPTH, BULLET_ENEMY_TINT } from "../data/Constants.js";
 import { lightenColor } from "../data/ColorUtils.js";
 import { createBullet } from "./Bullet.js";
 
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   constructor(scene, x, y, config = {}) {
+    // Assumption: an animation for this exact key (e.g. "default_enemy" /
+    // "turret_enemy_grounded") already exists in the scene's animation manager and
+    // its first frame lives on the 'enemy' texture/atlas passed to super() here. If
+    // your atlas key is different, swap 'enemy' below for whatever it actually is --
+    // this initial texture is only ever visible for a single frame before
+    // updateThreatState() below calls play() and takes over.
     super(scene, x, y, 'enemy');
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setDepth(DEPTH.enemy);
+    this.setScale(2);
 
-    const typeDefaults = ENEMY_TYPES[config.type || 'default'];
+    // Used to build this enemy's animation keys -- see getAnimationKey().
+    this.type = config.type || 'default';
+    const typeDefaults = ENEMY_TYPES[this.type];
 
     this.setVelocityX(0); // default type stays in its spawn x position
     this.affectedByGravity = config.affectedByGravity !== undefined ? config.affectedByGravity : typeDefaults.affectedByGravity;
@@ -40,10 +49,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     this.applyBodySettings();
 
-    // Initial threat-state color -- without this, an enemy that starts out of range
-    // (or, in principle, already past its warning window) would show its default
-    // appearance for the first frame or two until update() first runs.
-    this.updateThreatTint();
+    // Initial threat state (animation + tint) -- without this, an enemy that starts
+    // out of range (or, in principle, already past its warning window) would show
+    // its default appearance for the first frame or two until update() first runs.
+    this.updateThreatState();
 
     // Cooldown is tracked manually (decremented in update()) rather than with a
     // scene.time.addEvent loop, so that entering range doesn't have to wait out
@@ -71,7 +80,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.shoot();
       this.shootCooldownRemaining = this.shootCooldownMs;
     }
-    this.updateThreatTint();
+    this.updateThreatState();
   }
 
   // Arcade Physics Groups reapply their own defaults (collideWorldBounds: false,
@@ -96,21 +105,42 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     return true;
   }
 
-  // Recolors the enemy to reflect its current threat state: ENEMY_OUT_OF_RANGE_TINT
-  // if the player's outside its attack range entirely, ENEMY_WARNING_TINT if it's
-  // about to fire (in range, cooldown inside ENEMY_WARNING_TIME_MS), or its default
-  // appearance (clearTint) otherwise. Skipped entirely while a hit flash is in
-  // progress -- tracked via tintClearEvent, see hit() -- so the flash always takes
-  // visual priority and isn't overwritten a frame or two after it starts; once the
-  // flash's own timer clears it, that callback calls this again to pick up whichever
-  // of these states is current at that point, rather than always reverting to
-  // default.
-  updateThreatTint() {
+  // Builds this enemy's current animation key out of four pieces:
+  //   {type}_enemy            -- e.g. "default", "turret"
+  //   + "_grounded"           -- appended only if affected by gravity
+  //   + "_w"                  -- appended only while it's "about to fire" (in range,
+  //                              cooldown inside ENEMY_WARNING_TIME_MS) -- this is
+  //                              the animation-based replacement for the old warning
+  //                              tint. Out-of-range enemies never get "_w": they
+  //                              can't be about to fire if the player's out of range
+  //                              to begin with, same priority order the old tint
+  //                              logic used.
+  // e.g. a grounded turret about to fire: "turret_enemy_grounded_w".
+  getAnimationKey() {
+    let key = `${this.type}_enemy`;
+    if (this.affectedByGravity) key += '_grounded';
+    if (this.isPlayerInRange() && this.shootCooldownRemaining <= ENEMY_WARNING_TIME_MS) key += '_w';
+    return key;
+  }
+
+  // Updates the enemy to reflect its current threat state: plays whichever
+  // type/grounded/warning animation getAnimationKey() currently resolves to, and
+  // layers ENEMY_OUT_OF_RANGE_TINT (a light gray) on top if the player's outside its
+  // attack range entirely -- a subtle "dimmed" look rather than a distinct color, so
+  // it reads on top of any of the animations above. Skipped entirely while a hit
+  // flash is in progress -- tracked via tintClearEvent, see hit() -- so the flash
+  // always takes visual priority and isn't overwritten a frame or two after it
+  // starts; once the flash's own timer clears it, that callback calls this again to
+  // pick up whichever of these states is current at that point, rather than always
+  // reverting to default.
+  updateThreatState() {
     if (this.tintClearEvent) return;
+
+    const key = this.getAnimationKey();
+    if (this.anims.currentAnim?.key !== key) this.play(key, true);
+
     if (!this.isPlayerInRange()) {
       this.setTint(ENEMY_OUT_OF_RANGE_TINT);
-    } else if (this.shootCooldownRemaining <= ENEMY_WARNING_TIME_MS) {
-      this.setTint(ENEMY_WARNING_TINT);
     } else {
       this.clearTint();
     }
@@ -156,7 +186,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   // since multiplying by white is a no-op). Returns true if this hit killed it.
   hit(damage) {
     this.health -= damage;
-    this.setTintFill(lightenColor(ENEMY_BASE_TINT, HIT_FLASH_BRIGHTEN_AMOUNT));
+    this.setTintFill(lightenColor(BULLET_ENEMY_TINT, HIT_FLASH_BRIGHTEN_AMOUNT));
     // Each call to delayedCall() creates a brand new, independent timer -- with no
     // tracking, a second hit landing before the first hit's 100ms is up would still
     // leave the FIRST timer counting down to its own clearTint(), which then fires
@@ -168,7 +198,7 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (this.tintClearEvent) this.scene.time.removeEvent(this.tintClearEvent);
     this.tintClearEvent = this.scene.time.delayedCall(100, () => {
       this.tintClearEvent = null;
-      if (this.active) this.updateThreatTint();
+      if (this.active) this.updateThreatState();
     });
     return this.health <= 0;
   }

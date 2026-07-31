@@ -490,7 +490,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       const firingPenaltyActive = this.isCharging || this.isOnCooldown;
       const speedMult = firingPenaltyActive ? this.weapon.moveSpeedMultiplier : 1;
       const jumpMult = firingPenaltyActive ? this.weapon.jumpMultiplier : 1;
-      moved = left || right;
+      moved = (left && !this.body.blocked.left) || (right && !this.body.blocked.right);
 
       if (left) {
         this.setVelocityX(-PLAYER_STATS.moveSpeed * speedMult); this.facing = -1;

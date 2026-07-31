@@ -1,5 +1,3 @@
-import { ENEMY_BASE_TINT } from "./Constants.js";
-
 export const PLATFORM_TYPES = {
     normal: {},
 

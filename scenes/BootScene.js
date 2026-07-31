@@ -1,4 +1,4 @@
-import { ENEMY_BASE_TINT, BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, GOAL_BASE_TINT } from "../data/Constants.js";
+import { BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, GOAL_BASE_TINT } from "../data/Constants.js";
 
 export class BootScene extends Phaser.Scene {
 
@@ -8,6 +8,7 @@ export class BootScene extends Phaser.Scene {
 
     preload() {
         this.load.spritesheet("player", "assets/player.png", { frameWidth: 14, frameHeight: 20 });
+        this.load.spritesheet("enemy", "assets/enemy.png", { frameWidth: 15, frameHeight: 20 });
 
         this.load.spritesheet("default_weapon", "assets/weapon/default.png", { frameWidth: 11, frameHeight: 8 });
         this.load.spritesheet("beam_weapon", "assets/weapon/beam.png", { frameWidth: 13, frameHeight: 7 });
@@ -22,12 +23,6 @@ export class BootScene extends Phaser.Scene {
     create() {
 
         const g = this.add.graphics();
-
-        // Enemy
-        g.clear();
-        g.fillStyle(ENEMY_BASE_TINT, 1);
-        g.fillRect(0, 0, 30, 40);
-        g.generateTexture("enemy", 30, 40);
 
         // Platform
         g.clear();
@@ -102,6 +97,39 @@ export class BootScene extends Phaser.Scene {
         this.anims.create({
             key: "player_rise_c",
             frames: this.anims.generateFrameNumbers("player", { start: 7, end: 7 }),
+        });
+
+        this.anims.create({
+            key: "default_enemy_grounded",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 0, end: 0 }),
+        });
+        this.anims.create({
+            key: "default_enemy_grounded_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 1, end: 1 }),
+        });
+        this.anims.create({
+            key: "default_enemy",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 2, end: 2 }),
+        });
+        this.anims.create({
+            key: "default_enemy_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 3, end: 3 }),
+        });
+        this.anims.create({
+            key: "turret_enemy_grounded",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 4, end: 4 }),
+        });
+        this.anims.create({
+            key: "turret_enemy_grounded_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 5, end: 5 }),
+        });
+        this.anims.create({
+            key: "turret_enemy",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 6, end: 6 }),
+        });
+        this.anims.create({
+            key: "turret_enemy_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 7, end: 7 }),
         });
 
         this.anims.create({
