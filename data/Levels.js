@@ -486,7 +486,7 @@ export const LEVELS = [
             x: 50,
             y: 550
         },
-        timeLimitMs: 120000,
+        timeLimitMs: 95000,
         platforms: [
             { x1: 0, y1: 600, x2: 870, y2: 750, type: "normal" },
 
@@ -641,7 +641,7 @@ export const LEVELS = [
                 health: 3,
                 accuracy: 0.2,
                 affectedByGravity: false,
-                projectileSpeed: 550,
+                projectileSpeed: 500,
                 projectileCount: 3,
                 leftDist: 1150,
             },
@@ -653,7 +653,7 @@ export const LEVELS = [
                 health: 3,
                 accuracy: 0.2,
                 affectedByGravity: false,
-                projectileSpeed: 550,
+                projectileSpeed: 500,
                 projectileCount: 3,
                 leftDist: 1150,
             },
@@ -665,6 +665,7 @@ export const LEVELS = [
         weapon: "default",
         open: false,
         backgroundColor: 0x304993,
+        music: "counter",
     },
 
     {

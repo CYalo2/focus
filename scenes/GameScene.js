@@ -115,6 +115,24 @@ export class GameScene extends Phaser.Scene {
     // to null here since this scene instance is reused across levels (see winLevel()).
     this.chargeReadyIndicator = null;
 
+    // --- background music (optional per-level) ---
+    // `level.music`, if set, must already be a loaded audio key -- e.g. preloaded in
+    // BootScene the same way 'menu' and 'level_select' are. No key means no music at
+    // all for this level, rather than falling back to some default track. Stopped
+    // below the instant the scene shuts down (scene.restart() on retry, or
+    // scene.start() to level-select/menu on win/lose), so it never bleeds into
+    // whatever scene/level comes next -- same pattern as MenuScene/LevelSelectScene.
+    this.music = null;
+    if (level.music) {
+      if (this.cache.audio.exists(level.music)) {
+        this.music = this.sound.add(level.music, { loop: true, volume: 0.5 });
+        this.music.play();
+      } else {
+        console.warn(`Level ${this.levelIndex} specifies music "${level.music}", but no audio was preloaded under that key.`);
+      }
+    }
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.music?.stop());
+
     // --- world bounds (per-level config, falls back to a default) ---
     this.worldBounds = level.worldBounds || DEFAULT_WORLD_BOUNDS;
     this.physics.world.setBounds(0, 0, this.worldBounds.width, this.worldBounds.height);
@@ -361,6 +379,7 @@ export class GameScene extends Phaser.Scene {
     // without this, the very click that lands on "Resume" is still down on the first
     // post-pause frame and would otherwise read as an immediate fire input.
     this.player.fireInputArmed = false;
+    this.music?.pause();
     showPauseMenu(this).catch((err) => console.error("Failed to show pause menu:", err));
   }
 
@@ -375,6 +394,7 @@ export class GameScene extends Phaser.Scene {
     this.tweens.resumeAll();
     this.time.paused = false;
     this.anims.resumeAll();
+    this.music?.resume();
   }
 
   // Quick retry, callable from anywhere (R key while paused, the HUD's retry button,
@@ -721,6 +741,7 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.physics.pause();
+    this.music?.stop();
     // Same reset as loseLevel() -- if bullet time is still active (SHIFT held) at the
     // moment of winning, this.time/tweens/physics.world timeScale would otherwise stay
     // slowed. Scene.start('GameScene', ...) for the next level reuses this same scene
@@ -745,6 +766,7 @@ export class GameScene extends Phaser.Scene {
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.physics.pause();
+    this.music?.stop();
     this.player.setTint(0x555555);
     // If the player dies mid-bullet-time (SHIFT still held), update()'s toggle-off logic
     // below never runs again since it bails out on gameEnded -- reset these here instead,

@@ -21,6 +21,7 @@ export class BootScene extends Phaser.Scene {
 
         this.load.audio('menu', 'assets/music/Menu.wav');
         this.load.audio('level_select', 'assets/music/Level Select.wav');
+        this.load.audio('counter', 'assets/music/Counter.wav');
     }
     
     create() {
