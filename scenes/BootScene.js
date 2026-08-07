@@ -21,7 +21,13 @@ export class BootScene extends Phaser.Scene {
 
         this.load.audio('menu', 'assets/music/Menu.wav');
         this.load.audio('level_select', 'assets/music/Level Select.wav');
+
+        this.load.audio('uplifting', 'assets/music/Uplifting.wav');
+        this.load.audio('barrage', 'assets/music/Barrage.wav');
+        this.load.audio('rebuttal', 'assets/music/Rebuttal.wav');
+        this.load.audio('alacrity', 'assets/music/Alacrity.wav');
         this.load.audio('counter', 'assets/music/Counter.wav');
+        this.load.audio('counter2', 'assets/music/Counter2.wav');
     }
     
     create() {
@@ -134,6 +140,38 @@ export class BootScene extends Phaser.Scene {
         this.anims.create({
             key: "turret_enemy_w",
             frames: this.anims.generateFrameNumbers("enemy", { start: 7, end: 7 }),
+        });
+        this.anims.create({
+            key: "beam_enemy_grounded",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 8, end: 8 }),
+        });
+        this.anims.create({
+            key: "beam_enemy_grounded_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 9, end: 9 }),
+        });
+        this.anims.create({
+            key: "beam_enemy",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 10, end: 10 }),
+        });
+        this.anims.create({
+            key: "beam_enemy_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 11, end: 11 }),
+        });
+        this.anims.create({
+            key: "blaster_enemy_grounded",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 12, end: 12 }),
+        });
+        this.anims.create({
+            key: "blaster_enemy_grounded_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 13, end: 13 }),
+        });
+        this.anims.create({
+            key: "blaster_enemy",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 14, end: 14 }),
+        });
+        this.anims.create({
+            key: "blaster_enemy_w",
+            frames: this.anims.generateFrameNumbers("enemy", { start: 15, end: 15 }),
         });
 
         this.anims.create({

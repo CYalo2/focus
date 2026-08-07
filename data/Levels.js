@@ -43,7 +43,8 @@ export const LEVELS = [
         },
         weapon: "default",
         open: true,
-        backgroundColor: 0x213469,
+        backgroundColor: 0x6b88be,
+        music: "uplifting",
     },
     {
         name: "Perspicacious",
@@ -75,10 +76,10 @@ export const LEVELS = [
             { x1: 2025, y1: 250, x2: 2075, y2: 300, type: "redirect", direction: 90 },
             { x1: 1930, y1: 850, x2: 2850, y2: 900, type: "normal" },
 
-            { x1: 2380, y1: 160, x2: 2410, y2: 750, type: "normal" },
+            { x1: 2380, y1: 100, x2: 2410, y2: 750, type: "normal" },
             { x1: 2380, y1: 750, x2: 2410, y2: 850, type: "breakable", health: 3 },
-            { x1: 2820, y1: 160, x2: 2850, y2: 850, type: "normal" },
-            { x1: 2410, y1: 160, x2: 2820, y2: 190, type: "normal" },
+            { x1: 2820, y1: 100, x2: 2850, y2: 850, type: "normal" },
+            { x1: 2410, y1: 100, x2: 2820, y2: 130, type: "normal" },
             { x1: 2410, y1: 490, x2: 2690, y2: 520, type: "normal" },
         ],
         texts: [
@@ -138,6 +139,7 @@ export const LEVELS = [
                 affectedByGravity: false,
                 projectileCount: 3,
                 leftDist: 55,
+                topDist: 450,
             },
         ],
         goal: {
@@ -146,7 +148,8 @@ export const LEVELS = [
         },
         weapon: "default",
         open: true,
-        backgroundColor: 0x3b545b,
+        backgroundColor: 0x4191a7,
+        music: "uplifting",
     },
     {
         name: "Malleable",
@@ -276,7 +279,8 @@ export const LEVELS = [
         },
         weapon: "beam",
         open: false,
-        backgroundColor: 0x574841,
+        backgroundColor: 0x997e71,
+        music: "rebuttal",
     },
     {
         name: "Concomitant",
@@ -408,6 +412,7 @@ export const LEVELS = [
         weapon: "beam",
         open: false,
         backgroundColor: 0xa88989,
+        music: "barrage",
     },
     {
         name: "Oblique",
@@ -475,6 +480,7 @@ export const LEVELS = [
         weapon: "default",
         open: false,
         backgroundColor: 0x91a47e,
+        music: "rebuttal",
     },
     {
         name: "Synthesis",
@@ -589,7 +595,7 @@ export const LEVELS = [
                 type: "default",
                 health: 2,
                 affectedByGravity: false,
-                leftDist: 465,
+                leftDist: 365,
             },
             {
                 x: 2605,
@@ -724,6 +730,7 @@ export const LEVELS = [
         weapon: "default",
         open: true,
         backgroundColor: 0x3f2f40,
+        music: "alacrity",
     },
     {
         name: "Transmute",
@@ -851,6 +858,7 @@ export const LEVELS = [
         weapon: "default",
         open: false,
         backgroundColor: 0x623569,
+        music: "barrage",
     },
     {
         name: "Viscous",
@@ -979,6 +987,7 @@ export const LEVELS = [
         weapon: "default",
         open: false,
         backgroundColor: 0x49567b,
+        music: "rebuttal",
     },
     {
         name: "Oscillate",
@@ -1156,6 +1165,7 @@ export const LEVELS = [
         weapon: "default",
         open: false,
         backgroundColor: 0x87966f,
+        music: "rebuttal",
     },
     {
         name: "Destitute",
@@ -1352,6 +1362,7 @@ export const LEVELS = [
         weapon: "blaster",
         open: false,
         backgroundColor: 0x765661,
+        music: "barrage",
     },
     {
         name: "Obstreperous",
@@ -1363,7 +1374,7 @@ export const LEVELS = [
             x: 200,
             y: 420
         },
-        timeLimitMs: 150000,
+        timeLimitMs: 135000,
         platforms: [
             { x1: 0, y1: 610, x2: 1810, y2: 620, type: "death" },
 
@@ -1473,6 +1484,7 @@ export const LEVELS = [
                 x: 1015,
                 y: 20,
                 shootCooldownMs: 1000,
+                initialCooldownMs: 1200,
                 health: 3,
                 accuracy: 0.5,
                 type: "default",
@@ -1670,5 +1682,214 @@ export const LEVELS = [
         weapon: "blaster",
         open: false,
         backgroundColor: 0x6fb6b3,
+        music: "counter2",
+    },
+
+    {
+        name: "Alacrity",
+        worldBounds: {
+            width: 1280,
+            height: 720
+        },
+        playerSpawn: {
+            x: 640,
+            y: 640
+        },
+        timeLimitMs: 15000,
+        platforms: [
+            { x1: 95, y1: 710, x2: 1185, y2: 720, type: "death" },
+
+            { x1: 565, y1: 660, x2: 715, y2: 690, type: "normal" },
+
+            { x1: 95, y1: 595, x2: 295, y2: 625, type: "breakable", health: 1 },
+            { x1: 985, y1: 595, x2: 1185, y2: 625, type: "breakable", health: 1 },
+
+            { x1: 565, y1: 80, x2: 715, y2: 430, type: "normal" },
+            { x1: 365, y1: 430, x2: 915, y2: 460, type: "normal" },
+
+            { x1: 95, y1: 120, x2: 565, y2: 150, type: "breakable", health: 5 },
+            { x1: 715, y1: 120, x2: 1185, y2: 150, type: "breakable", health: 5 },
+
+            { x1: 0, y1: 120, x2: 95, y2: 720, type: "normal" },
+            { x1: 1185, y1: 120, x2: 1280, y2: 720, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 195,
+                y: 100,
+                initialCooldownMs: 1000,
+                health: 1,
+                type: "beam",
+                affectedByGravity: true,
+            },
+            {
+                x: 1085,
+                y: 100,
+                initialCooldownMs: 1000,
+                health: 1,
+                type: "beam",
+                affectedByGravity: true,
+            },
+        ],
+        goal: {
+            x: 640,
+            y: 50
+        },
+        weapon: "default",
+        open: true,
+        backgroundColor: 0xc8d18b,
+        music: "alacrity",
+    },
+    {
+        name: "Defer",
+        worldBounds: {
+            width: 1280,
+            height: 720
+        },
+        playerSpawn: {
+            x: 640,
+            y: 200
+        },
+        timeLimitMs: 60000,
+        platforms: [
+            { x1: 440, y1: 220, x2: 840, y2: 250, type: "oneway" },
+            { x1: 540, y1: 250, x2: 740, y2: 280, type: "bounceable" },
+
+            { x1: 0, y1: 0, x2: 100, y2: 720, type: "normal" },
+            { x1: 100, y1: 0, x2: 130, y2: 720, type: "bounceable" },
+            { x1: 1180, y1: 0, x2: 1280, y2: 720, type: "normal" },
+            { x1: 1150, y1: 0, x2: 1180, y2: 720, type: "bounceable" },
+
+            { x1: 440, y1: 0, x2: 490, y2: 50, type: "redirect", direction: 70 },
+            { x1: 790, y1: 0, x2: 840, y2: 50, type: "redirect", direction: 110 },
+            { x1: 500, y1: 0, x2: 550, y2: 50, type: "redirect", direction: 30 },
+            { x1: 730, y1: 0, x2: 780, y2: 50, type: "redirect", direction: 150 },
+
+            { x1: 440, y1: 365, x2: 490, y2: 415, type: "redirect", direction: 270 },
+            { x1: 790, y1: 365, x2: 840, y2: 415, type: "redirect", direction: 270 },
+
+            { x1: 440, y1: 600, x2: 490, y2: 650, type: "redirect", direction: 230 },
+            { x1: 790, y1: 600, x2: 840, y2: 650, type: "redirect", direction: 310 },
+
+            { x1: 410, y1: 190, x2: 440, y2: 220, type: "redirect", direction: 20 },
+            { x1: 840, y1: 190, x2: 870, y2: 220, type: "redirect", direction: 160 },
+
+            { x1: 200, y1: 50, x2: 250, y2: 100, type: "redirect", direction: 50 },
+            { x1: 1030, y1: 50, x2: 1080, y2: 100, type: "redirect", direction: 130 },
+
+            { x1: 540, y1: 500, x2: 740, y2: 685, type: "breakable", health: 5 },
+            { x1: 540, y1: 485, x2: 640, y2: 500, type: "redirect", direction: 194.3 },
+            { x1: 640, y1: 485, x2: 740, y2: 500, type: "redirect", direction: 345.7 },
+
+            { x1: 620, y1: 280, x2: 640, y2: 300, type: "redirect", direction: 190 },
+            { x1: 640, y1: 280, x2: 660, y2: 300, type: "redirect", direction: 350 },
+
+            { x1: 130, y1: 710, x2: 1150, y2: 720, type: "death" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 640,
+                y: 480,
+                type: "default",
+                shootCooldownMs: 2500,
+                initialCooldownMs: 200,
+                health: 8,
+                accuracy: 0,
+                affectedByGravity: true,
+                projectileSpeed: 450,
+                projectileCount: 5,
+            },
+        ],
+        goal: {
+            x: 640,
+            y: 680
+        },
+        weapon: "beam",
+        open: true,
+        backgroundColor: 0xeca6ff,
+        music: "alacrity",
+    },
+    {
+        name: "Exhort",
+        worldBounds: {
+            width: 2060,
+            height: 720
+        },
+        playerSpawn: {
+            x: 105,
+            y: 670
+        },
+        timeLimitMs: 60000,
+        platforms: [
+            { x1: 0, y1: 0, x2: 30, y2: 720, type: "normal" },
+            { x1: 30, y1: 690, x2: 2030, y2: 720, type: "normal" },
+            { x1: 2030, y1: 0, x2: 2060, y2: 720, type: "normal" },
+
+            { x1: 180, y1: 680, x2: 630, y2: 690, type: "death" },
+            { x1: 30, y1: 530, x2: 630, y2: 540, type: "death" },
+            { x1: 30, y1: 310, x2: 630, y2: 530, type: "enemyPassthrough" },
+            { x1: 180, y1: 300, x2: 630, y2: 310, type: "death" },
+            { x1: 180, y1: 170, x2: 680, y2: 180, type: "death" },
+
+            { x1: 680, y1: 170, x2: 730, y2: 690, type: "normal" },
+            { x1: 580, y1: 80, x2: 730, y2: 170, type: "enemyPassthrough" },
+
+            { x1: 780, y1: 0, x2: 1280, y2: 470, type: "normal" },
+            { x1: 780, y1: 470, x2: 1280, y2: 480, type: "death" },
+            { x1: 730, y1: 680, x2: 1280, y2: 690, type: "death" },
+
+            { x1: 1380, y1: 470, x2: 1930, y2: 480, type: "death" },
+            { x1: 1380, y1: 680, x2: 1930, y2: 690, type: "death" },
+            { x1: 1280, y1: 210, x2: 1930, y2: 470, type: "enemyPassthrough" },
+            { x1: 1380, y1: 160, x2: 1830, y2: 210, type: "enemyPassthrough" },
+            { x1: 1930, y1: 230, x2: 2030, y2: 260, type: "redirect", direction: 90 },
+            { x1: 1880, y1: 160, x2: 1930, y2: 210, type: "breakable", health: 1 },
+
+            { x1: 1280, y1: 130, x2: 1830, y2: 160, type: "enemyPassthrough" },
+            { x1: 1480, y1: 120, x2: 1830, y2: 130, type: "death" },
+
+            { x1: 1280, y1: 0, x2: 2030, y2: 30, type: "normal" },
+            { x1: 1880, y1: 30, x2: 2030, y2: 160, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 655,
+                y: 60,
+                shootCooldownMs: 3000,
+                initialCooldownMs: 1000,
+                health: 1,
+                accuracy: 1,
+                type: "blaster",
+                projectileSpeed: 1200,
+                affectedByGravity: false,
+                explosionDamage: 0,
+            },
+            {
+                x: 1330,
+                y: 190,
+                shootCooldownMs: 2500,
+                health: 1,
+                accuracy: 1,
+                type: "blaster",
+                projectileSpeed: 1200,
+                affectedByGravity: false,
+                explosionDamage: 0,
+                leftDist: -50,
+            },
+        ],
+        goal: {
+            x: 1380,
+            y: 100
+        },
+        weapon: "blaster",
+        open: true,
+        backgroundColor: 0xc8d18b,
+        music: "rebuttal",
     },
 ];

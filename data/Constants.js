@@ -1,3 +1,5 @@
+export const BACKGROUND_COLOR = 0x1a1a22;
+
 export const BULLET_TIME_MULTIPLIER = 0.5;
 
 export const GRAVITY = 1400;

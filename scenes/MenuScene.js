@@ -1,4 +1,7 @@
 import { initAudioManager } from "../save/AudioManager.js";
+import { createBackground } from "../ui/PlatformBackground.js";
+import { getCurrentBackground } from "../ui/BackgroundManager.js";
+import { fadeIn, fadeToScene } from "../ui/SceneTransitions.js";
 
 export class MenuScene extends Phaser.Scene {
 
@@ -9,6 +12,10 @@ export class MenuScene extends Phaser.Scene {
     async create() {
 
         const { width, height } = this.scale;
+
+        fadeIn(this);
+
+        createBackground(this, await getCurrentBackground());
 
         // No-ops after the first call -- MenuScene is the first scene reached after
         // BootScene, so this is as good a place as any to load the saved volume and
@@ -49,7 +56,7 @@ export class MenuScene extends Phaser.Scene {
         play.on("pointerover", () => play.setColor("#ffffff"));
         play.on("pointerout", () => play.setColor("#3aa0ff"));
 
-        const startPlay = () => this.scene.start("LevelSelectScene");
+        const startPlay = () => fadeToScene(this, "LevelSelectScene");
         play.on("pointerdown", startPlay);
         this.input.keyboard.on("keydown-SPACE", startPlay);
 

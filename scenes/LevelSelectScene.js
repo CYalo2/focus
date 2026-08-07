@@ -1,13 +1,18 @@
 import { LEVELS } from "../data/Levels.js";
 import { getBestTime, isLevelComplete } from "../save/SaveManager.js";
 import { formatTime } from "../data/TimeUtils.js";
-import { initAudioManager } from "../save/AudioManager.js";
+import { initAudioManager, getVolume, setVolume, isSdkMuted } from "../save/AudioManager.js";
+import { createBackground } from "../ui/PlatformBackground.js";
+import { getCurrentBackground, rerollBackground } from "../ui/BackgroundManager.js";
+import { fadeIn, fadeToScene } from "../ui/SceneTransitions.js";
 
 const COLS = 3;
 const ROWS = 2;
 const PAGE_SIZE = COLS * ROWS;
 const TILE_SIZE = 180;
 const TILE_GAP = 40;
+const TILE_BORDER_WIDTH = 2; // width of each of the tile card's two stroked borders (outer UI color + inner level-preview color)
+const MODAL_BORDER_WIDTH = 2; // same doubled-border treatment, sized for the level-details modal panel
 const GRID_TOP_Y = 220; // top edge of the grid, below the "SELECT LEVEL" title
 
 export class LevelSelectScene extends Phaser.Scene {
@@ -19,6 +24,8 @@ export class LevelSelectScene extends Phaser.Scene {
     async create(data) {
 
         const { width } = this.scale;
+
+        fadeIn(this);
 
         // No-op if MenuScene already ran it (the normal path) -- kept here too in
         // case this scene is ever reached first, so volume/mute are still correct.
@@ -56,6 +63,14 @@ export class LevelSelectScene extends Phaser.Scene {
             this.page = Phaser.Math.Clamp(Math.floor(focusIndex / PAGE_SIZE), 0, this.totalPages - 1);
             this.hasNavigated = true;
         }
+
+        // Same background preset as MenuScene shows (see BackgroundManager) unless
+        // we're arriving back here from a level -- data.focusLevelIndex being set is
+        // that signal (see above) -- in which case it's time to roll a new one, which
+        // MenuScene will then also pick up next time it's shown.
+        const arrivingFromLevel = Number.isInteger(data?.focusLevelIndex);
+        const backgroundPreset = arrivingFromLevel ? await rerollBackground() : await getCurrentBackground();
+        this.updateBackground = createBackground(this, backgroundPreset, 15); // straight horizontal drift
 
         // Unlock state per level, indexed the same as LEVELS. Starts all-locked
         // (except level 0, handled by isLevelUnlocked) so buildPage() has something
@@ -108,16 +123,64 @@ export class LevelSelectScene extends Phaser.Scene {
         });
 
         back.on("pointerdown", () => {
-            this.scene.start("MenuScene");
+            fadeToScene(this, "MenuScene");
         });
+
+        // Mirrors "< back" on the opposite corner. Right-aligned via setOrigin so it
+        // stays anchored to the corner regardless of label width.
+        const settingsButton = this.add.text(
+            width - 60,
+            40,
+            "settings",
+            {
+                fontSize: "18px",
+                color: "#888888"
+            }
+        ).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+
+        settingsButton.on("pointerover", () => settingsButton.setColor("#ffffff"));
+        settingsButton.on("pointerout", () => settingsButton.setColor("#888888"));
+        settingsButton.on("pointerdown", () => this.openSettings());
 
         // Space bar acts as the modal's PLAY button -- only does anything while a level's
         // details are actually open, since there's no "current level" to start otherwise.
         // Registered once here (not per-modal in showLevelDetailsModal) since the modal is
         // torn down and rebuilt every time it opens/closes, but this scene instance and its
-        // keyboard plugin persist for as long as the player stays on this screen.
-        this.input.keyboard.on("keydown-SPACE", () => {
+        // keyboard plugin persist for as long as the player stays on this screen. Guarded
+        // against event.repeat (the synthetic keydowns a held key fires) so holding SPACE
+        // doesn't fire scene.start() repeatedly.
+        this.input.keyboard.on("keydown-SPACE", (event) => {
+            if (event.repeat) return;
             if (this.modalContainer) this.scene.start("GameScene", { levelIndex: this.modalLevelIndex });
+        });
+
+        // Same guard as the settings button click -- openSettings() already no-ops
+        // if a level-details modal (or the settings modal itself) is already open.
+        // event.repeat guard so holding E doesn't repeatedly no-op/open it either.
+        this.input.keyboard.on("keydown-E", (event) => {
+            if (event.repeat) return;
+            this.openSettings();
+        });
+
+        // Arrow keys (and A/D) mirror the on-screen </> buttons -- changePage()
+        // already has all the bounds/unlock guards, so these just forward into it.
+        // event.repeat guard so holding a key pages once per press instead of
+        // machine-gunning through pages at OS key-repeat rate.
+        this.input.keyboard.on("keydown-LEFT", (event) => {
+            if (event.repeat) return;
+            this.changePage(-1);
+        });
+        this.input.keyboard.on("keydown-RIGHT", (event) => {
+            if (event.repeat) return;
+            this.changePage(1);
+        });
+        this.input.keyboard.on("keydown-A", (event) => {
+            if (event.repeat) return;
+            this.changePage(-1);
+        });
+        this.input.keyboard.on("keydown-D", (event) => {
+            if (event.repeat) return;
+            this.changePage(1);
         });
 
         this.buildPage();
@@ -135,12 +198,37 @@ export class LevelSelectScene extends Phaser.Scene {
         this.scale.refresh();
     }
 
+    update(time, delta) {
+        // create() is async and awaits initAudioManager() before reaching the
+        // createBackground() call -- Phaser doesn't wait for that promise, so
+        // update() can run for the first several frames before updateBackground
+        // is actually assigned.
+        if (this.updateBackground) this.updateBackground(delta);
+    }
+
     changePage(delta) {
         const newPage = this.page + delta;
         if (newPage < 0 || newPage >= this.totalPages) return;
+        // Nothing to do on a page that's entirely locked tiles -- there's no level
+        // there the player could actually open yet.
+        if (!this.pageHasUnlockedLevel(newPage)) return;
         this.page = newPage;
         this.hasNavigated = true;
         this.buildPage();
+    }
+
+    // Whether any level on pageIndex is currently unlocked. Levels unlock in one
+    // unbroken run from level 0, so in practice this is only ever true for pages up
+    // through the one holding furthestUnlockedLevelIndex() -- but it's written as a
+    // per-page scan (rather than a single index comparison) so it stays correct even
+    // if the unlock rule ever stops being "sequential from the start".
+    pageHasUnlockedLevel(pageIndex) {
+        const startIndex = pageIndex * PAGE_SIZE;
+        const endIndex = Math.min(startIndex + PAGE_SIZE, LEVELS.length);
+        for (let i = startIndex; i < endIndex; i++) {
+            if (this.isLevelUnlocked(i)) return true;
+        }
+        return false;
     }
 
     // Loads completion status for every level (not just the current page, since
@@ -235,8 +323,27 @@ export class LevelSelectScene extends Phaser.Scene {
 
             const unlocked = this.isLevelUnlocked(i);
 
+            // Every 6th level (numbering from 1, so levels 6/12/18/...) gets a
+            // thicker border on its tile as a visual milestone marker -- doubled
+            // rather than some arbitrary bump so it still divides evenly for the
+            // inset inner border below.
+            const levelNumber = i + 1;
+            const borderWidth = levelNumber % 6 === 0 ? TILE_BORDER_WIDTH * 2 : TILE_BORDER_WIDTH;
+
             const card = this.add.rectangle(x, y, TILE_SIZE, TILE_SIZE, unlocked ? 0x222222 : 0x151515)
-                .setStrokeStyle(2, unlocked ? 0x555555 : 0x333333);
+                .setStrokeStyle(borderWidth, unlocked ? 0x555555 : 0x333333);
+
+            // Sits flush against the inside edge of card's stroke (inset by exactly
+            // its width, same stroke width again) so the two borders read as one
+            // border twice as thick -- outer half fixed UI color, inner half a
+            // preview of the color the level itself will open into. Locked tiles
+            // don't get this -- their color stays a UI grey like the rest of the
+            // locked card, since the level's own color is part of what you unlock.
+            const innerBorder = this.add.rectangle(
+                x, y,
+                TILE_SIZE - borderWidth * 2,
+                TILE_SIZE - borderWidth * 2
+            ).setStrokeStyle(borderWidth, unlocked ? LEVELS[i].backgroundColor : 0x222222);
 
             // Locked tiles show a drawn lock icon instead of the level number, and
             // stay non-interactive -- no hover/click handlers at all, rather than
@@ -248,18 +355,40 @@ export class LevelSelectScene extends Phaser.Scene {
 
             if (unlocked) {
                 card.setInteractive({ useHandCursor: true });
-                card.on("pointerover", () => card.setStrokeStyle(2, 0x3aa0ff));
-                card.on("pointerout", () => card.setStrokeStyle(2, 0x555555));
+                card.on("pointerover", () => card.setStrokeStyle(borderWidth, 0x3aa0ff));
+                card.on("pointerout", () => card.setStrokeStyle(borderWidth, 0x555555));
                 card.on("pointerdown", () => this.openLevelDetails(i));
             }
 
-            this.gridContainer.add([card, content]);
+            this.gridContainer.add([card, innerBorder, content]);
         }
 
-        // No arrow at all (rather than a disabled-looking one) when there's nothing
-        // in that direction to page to.
-        this.leftArrow.setVisible(this.page > 0);
-        this.rightArrow.setVisible(this.page < this.totalPages - 1);
+        // Hidden entirely when there's no page there at all (off the end of the
+        // level list). Greyed out and non-interactive, but still visible, when a
+        // page exists in that direction but every level on it is still locked --
+        // that way "nothing to page to yet" reads differently from "there's simply
+        // nothing more".
+        const hasPageLeft = this.page > 0;
+        const hasPageRight = this.page < this.totalPages - 1;
+        const leftEnabled = hasPageLeft && this.pageHasUnlockedLevel(this.page - 1);
+        const rightEnabled = hasPageRight && this.pageHasUnlockedLevel(this.page + 1);
+
+        this.leftArrow.setVisible(hasPageLeft);
+        this.rightArrow.setVisible(hasPageRight);
+
+        this.leftArrow.setColor(leftEnabled ? "#3aa0ff" : "#555555");
+        this.rightArrow.setColor(rightEnabled ? "#3aa0ff" : "#555555");
+
+        if (leftEnabled) {
+            this.leftArrow.setInteractive({ useHandCursor: true });
+        } else {
+            this.leftArrow.disableInteractive();
+        }
+        if (rightEnabled) {
+            this.rightArrow.setInteractive({ useHandCursor: true });
+        } else {
+            this.rightArrow.disableInteractive();
+        }
     }
 
     async openLevelDetails(levelIndex) {
@@ -267,6 +396,9 @@ export class LevelSelectScene extends Phaser.Scene {
         // this shouldn't normally be reachable for a locked level -- but guard here
         // too rather than relying solely on the UI not exposing the click.
         if (!this.isLevelUnlocked(levelIndex)) return;
+
+        // Don't stack this modal on top of the settings modal.
+        if (this.settingsModalContainer) return;
 
         const level = LEVELS[levelIndex];
 
@@ -308,8 +440,17 @@ export class LevelSelectScene extends Phaser.Scene {
         // pointerdown to the topmost interactive object under the pointer, so this is
         // what stops a click on the panel from also being seen as an overlay click.
         const panel = this.add.rectangle(width / 2, height / 2, 420, 380, 0x1a1a22)
-            .setStrokeStyle(2, 0x3aa0ff)
+            .setStrokeStyle(MODAL_BORDER_WIDTH, 0x3aa0ff)
             .setInteractive();
+
+        // Same doubled-border treatment as the level select tiles: an inset
+        // rectangle, borders flush, tinted with this level's own backgroundColor so
+        // the modal previews the color the level opens into before you press play.
+        const panelInnerBorder = this.add.rectangle(
+            width / 2, height / 2,
+            420 - MODAL_BORDER_WIDTH * 2,
+            380 - MODAL_BORDER_WIDTH * 2
+        ).setStrokeStyle(MODAL_BORDER_WIDTH, level.backgroundColor);
 
         const title = this.add.text(width / 2, height / 2 - 150, level.name, {
             fontSize: "28px",
@@ -346,7 +487,7 @@ export class LevelSelectScene extends Phaser.Scene {
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         this.modalContainer = this.add.container(0, 0, [
-            overlay, panel, title, enemiesText, timeLimitText, bestTimeText, playButton, closeButton
+            overlay, panel, panelInnerBorder, title, enemiesText, timeLimitText, bestTimeText, playButton, closeButton
         ]);
 
         const closeModal = () => {
@@ -360,6 +501,101 @@ export class LevelSelectScene extends Phaser.Scene {
 
         playButton.on("pointerover", () => playButton.setColor("#ffffff"));
         playButton.on("pointerout", () => playButton.setColor("#3aa0ff"));
+    }
+
+    openSettings() {
+        // Don't stack this modal on top of a level-details modal (or itself, if the
+        // button is somehow double-clicked before the first modal finishes opening).
+        if (this.modalContainer || this.settingsModalContainer) return;
+
+        this.showSettingsModal();
+    }
+
+    // Same plain -/+ volume row as PauseMenu's, in its own small modal here since
+    // this scene otherwise has no "settings" surface at all.
+    showSettingsModal() {
+        const { width, height } = this.scale;
+
+        const VOLUME_STEP = 0.1;
+
+        const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
+            .setOrigin(0)
+            .setInteractive();
+
+        const panel = this.add.rectangle(width / 2, height / 2, 380, 260, 0x1a1a22)
+            .setStrokeStyle(2, 0x3aa0ff)
+            .setInteractive();
+
+        const title = this.add.text(width / 2, height / 2 - 90, "SETTINGS", {
+            fontSize: "28px",
+            color: "#ffffff"
+        }).setOrigin(0.5);
+
+        const volumeLabelBase = "MUSIC VOLUME";
+        const volumeLabel = this.add.text(
+            width / 2, height / 2 - 40,
+            isSdkMuted() ? `${volumeLabelBase} (muted by host)` : volumeLabelBase,
+            { fontSize: "14px", color: "#888888" }
+        ).setOrigin(0.5);
+
+        const volumeDown = this.add.text(width / 2 - 80, height / 2, "-", { fontSize: "28px", color: "#3aa0ff" })
+            .setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        const volumeText = this.add.text(width / 2, height / 2, `${Math.round(getVolume() * 100)}%`, {
+            fontSize: "20px", color: "#ffffff"
+        }).setOrigin(0.5);
+
+        const volumeUp = this.add.text(width / 2 + 80, height / 2, "+", { fontSize: "28px", color: "#3aa0ff" })
+            .setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        const closeButton = this.add.text(width / 2, height / 2 + 90, "close", {
+            fontSize: "16px",
+            color: "#888888"
+        }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+        this.settingsModalContainer = this.add.container(0, 0, [
+            overlay, panel, title, volumeLabel, volumeDown, volumeText, volumeUp, closeButton
+        ]);
+        this.settingsModalContainer.setDepth(1000);
+
+        const closeModal = () => {
+            this.settingsModalContainer.destroy();
+            this.settingsModalContainer = null;
+            this.input.keyboard.off("keydown-SPACE", closeOnKey);
+            this.input.keyboard.off("keydown-E", closeOnKey);
+        };
+
+        // Wraps closeModal so the keyboard listeners can filter out event.repeat --
+        // closeModal itself stays callable directly from the click handlers below,
+        // which pass no event object at all.
+        const closeOnKey = (event) => {
+            if (event.repeat) return;
+            closeModal();
+        };
+
+        // Both keys just toggle the modal shut here -- E is the same key that opened
+        // it, and SPACE is safe to repurpose since the global SPACE handler in
+        // create() only acts while a level-details modal is open, not this one.
+        this.input.keyboard.on("keydown-SPACE", closeOnKey);
+        this.input.keyboard.on("keydown-E", closeOnKey);
+
+        volumeDown.on("pointerdown", async () => {
+            const newVolume = await setVolume(getVolume() - VOLUME_STEP);
+            volumeText.setText(`${Math.round(newVolume * 100)}%`);
+        });
+        volumeUp.on("pointerdown", async () => {
+            const newVolume = await setVolume(getVolume() + VOLUME_STEP);
+            volumeText.setText(`${Math.round(newVolume * 100)}%`);
+        });
+        volumeDown.on("pointerover", () => volumeDown.setColor("#ffffff"));
+        volumeDown.on("pointerout", () => volumeDown.setColor("#3aa0ff"));
+        volumeUp.on("pointerover", () => volumeUp.setColor("#ffffff"));
+        volumeUp.on("pointerout", () => volumeUp.setColor("#3aa0ff"));
+
+        overlay.on("pointerdown", closeModal);
+        closeButton.on("pointerdown", closeModal);
+        closeButton.on("pointerover", () => closeButton.setColor("#ffffff"));
+        closeButton.on("pointerout", () => closeButton.setColor("#888888"));
     }
 
 }

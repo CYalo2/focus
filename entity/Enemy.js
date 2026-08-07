@@ -27,11 +27,31 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.accuracy = config.accuracy !== undefined ? config.accuracy : typeDefaults.accuracy;
     this.projectileSpeed = config.projectileSpeed !== undefined ? config.projectileSpeed : typeDefaults.projectileSpeed;
     this.projectileCount = config.projectileCount !== undefined ? config.projectileCount : typeDefaults.projectileCount;
+
+    // Instant hitscan attack instead of a travelling projectile -- see shoot() below,
+    // which branches on this instead of looping fireBullet() over projectileCount.
+    // beamRange left undefined (by config or the type's own default, as with 'beam')
+    // falls back to the world's full diagonal in GameScene.fireEnemyBeam(), same as
+    // the player beam weapon's own beamRange fallback.
+    this.isBeam = config.isBeam !== undefined ? config.isBeam : (typeDefaults.isBeam || false);
+    this.beamDamage = config.beamDamage !== undefined ? config.beamDamage : typeDefaults.beamDamage;
+    this.beamRange = config.beamRange !== undefined ? config.beamRange : typeDefaults.beamRange;
+    this.beamWidth = config.beamWidth !== undefined ? config.beamWidth : typeDefaults.beamWidth;
     // Fixed firing direction, in degrees -- if set (by config or the type's own
     // default, as with 'turret'), shoot() fires along this angle instead of aiming at
     // the player. Stays undefined for types like 'default' that don't define one,
     // which is exactly what keeps them aiming at the player.
     this.angleDeg = config.angleDeg !== undefined ? config.angleDeg : typeDefaults.angleDeg;
+
+    // Explosive projectiles -- reuses GameScene's existing explodesOnHit/
+    // explosionRadius/damage bullet system (see fireBullet() below and
+    // GameScene.explodeBullet()), the same one the player's own explosive weapons
+    // use. explodesOnHit left undefined/false (every type except 'blaster') means
+    // fireBullet() creates a plain bullet exactly as before, so explosionRadius/
+    // explosionDamage are simply unused in that case.
+    this.explodesOnHit = config.explodesOnHit !== undefined ? config.explodesOnHit : (typeDefaults.explodesOnHit || false);
+    this.explosionRadius = config.explosionRadius !== undefined ? config.explosionRadius : typeDefaults.explosionRadius;
+    this.explosionDamage = config.explosionDamage !== undefined ? config.explosionDamage : typeDefaults.explosionDamage;
 
     // Velocity (px/s) applied away from an incoming hit's direction when a player
     // projectile hits this enemy. 0 (the default) means no knockback at all -- see
@@ -154,6 +174,15 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       : Phaser.Math.Angle.Between(this.x, this.y, this.scene.player.x, this.scene.player.y);
     const spread = (1 - this.accuracy) * ENEMY_MAX_INACCURACY_RAD;
 
+    // Beam types fire a single instant hitscan shot (resolved entirely in
+    // GameScene.fireEnemyBeam) rather than looping projectileCount travelling
+    // bullets -- projectileCount is simply unused in this branch.
+    if (this.isBeam) {
+      const offset = (Math.random() - Math.random()) * spread;
+      this.scene.fireEnemyBeam(this, baseAngle + offset);
+      return;
+    }
+
     for (let i = 0; i < this.projectileCount; i++) {
       const offset = (Math.random() - Math.random()) * spread; // triangular distribution, weighted toward 0
       this.fireBullet(baseAngle + offset);
@@ -161,7 +190,18 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 
   fireBullet(angle) {
-    createBullet(this.scene, this.scene.enemyBullets, 'bulletEnemy', this.x, this.y, angle, this.projectileSpeed);
+    const bullet = createBullet(this.scene, this.scene.enemyBullets, 'bulletEnemy', this.x, this.y, angle, this.projectileSpeed);
+    // Stamps the bullet with the exact fields GameScene.explodeBullet() reads
+    // (explodesOnHit/explosionRadius/damage -- the same convention the player's own
+    // explosive weapons use) so it detonates on impact. These travel with the
+    // bullet itself rather than being looked up from the enemy, since the enemy
+    // that fired it may no longer exist (or be out of range/reused) by the time the
+    // bullet actually hits something.
+    if (this.explodesOnHit) {
+      bullet.explodesOnHit = true;
+      bullet.explosionRadius = this.explosionRadius;
+      bullet.damage = this.explosionDamage;
+    }
   }
 
   // Pushes the enemy along `angle` (the incoming bullet's direction of travel) at

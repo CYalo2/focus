@@ -157,32 +157,55 @@ function subtractCoveredRanges(start, end, coveredRanges) {
 // single outline around its outside, rather than each platform getting its
 // own fully-boxed border. Called once for OUTLINE_PLATFORM_TYPES and again,
 // separately, for bounceable platforms with a pale green color/alpha.
-function drawPlatformOutlines(scene, platforms, color = 0x000000, alpha = BORDER_DARKEN_ALPHA) {
+// wrapWidth/wrapHeight are only passed by the decorative background renderer
+// (see PlatformBackground.js) -- real levels call this via createPlatforms with
+// no wrap size, so these stay undefined there and every `wrapHeight &&` /
+// `wrapWidth &&` guard below short-circuits false, leaving level behavior
+// exactly as before.
+function drawPlatformOutlines(scene, platforms, color = 0x000000, alpha = BORDER_DARKEN_ALPHA, wrapWidth, wrapHeight) {
   const graphics = scene.add.graphics();
   graphics.setDepth(DEPTH.platform + 1);
   graphics.fillStyle(color, alpha);
 
   platforms.forEach(p => {
+    // Alongside the normal "shares this exact edge" match, also treat a platform
+    // as touching if it sits exactly one wrap-period away on the parallel axis --
+    // e.g. q.bottom === p.top + wrapHeight means q is at the very bottom of the
+    // tile (bottom === wrapHeight) while p is at the very top (top === 0), which
+    // is exactly the pair that ends up adjacent once a background tile repeats.
+    // q !== p is only required to guard the *non-wrap* match -- a platform can
+    // never be non-wrap-adjacent to itself (that would need its own top===bottom).
+    // For the wrap match, q === p is exactly the legitimate case where a single
+    // platform spans the tile's full wrap dimension and needs to wrap into its
+    // own next copy (e.g. a full-height side pillar) -- excluding self there was
+    // what left those platforms' seam borders undrawn-but-not-quite: they'd never
+    // find a *different* platform to wrap-match against, so the seam border never
+    // got suppressed. Splitting q !== p out per-branch lets self-matches through
+    // only where wrapping is actually active.
     const touchingAbove = platforms
-      .filter(q => q !== p && q.bottom === p.top && q.right > p.left && q.left < p.right)
+      .filter(q => (q !== p || wrapHeight) && q.right > p.left && q.left < p.right &&
+        (q.bottom === p.top || (wrapHeight && q.bottom === p.top + wrapHeight)))
       .map(q => [Math.max(q.left, p.left), Math.min(q.right, p.right)]);
     subtractCoveredRanges(p.left, p.right, touchingAbove)
       .forEach(([s, e]) => graphics.fillRect(s, p.top, e - s, BORDER_WIDTH));
 
     const touchingBelow = platforms
-      .filter(q => q !== p && q.top === p.bottom && q.right > p.left && q.left < p.right)
+      .filter(q => (q !== p || wrapHeight) && q.right > p.left && q.left < p.right &&
+        (q.top === p.bottom || (wrapHeight && q.top === p.bottom - wrapHeight)))
       .map(q => [Math.max(q.left, p.left), Math.min(q.right, p.right)]);
     subtractCoveredRanges(p.left, p.right, touchingBelow)
       .forEach(([s, e]) => graphics.fillRect(s, p.bottom - BORDER_WIDTH, e - s, BORDER_WIDTH));
 
     const touchingLeft = platforms
-      .filter(q => q !== p && q.right === p.left && q.bottom > p.top && q.top < p.bottom)
+      .filter(q => (q !== p || wrapWidth) && q.bottom > p.top && q.top < p.bottom &&
+        (q.right === p.left || (wrapWidth && q.right === p.left + wrapWidth)))
       .map(q => [Math.max(q.top, p.top), Math.min(q.bottom, p.bottom)]);
     subtractCoveredRanges(p.top, p.bottom, touchingLeft)
       .forEach(([s, e]) => graphics.fillRect(p.left, s, BORDER_WIDTH, e - s));
 
     const touchingRight = platforms
-      .filter(q => q !== p && q.left === p.right && q.bottom > p.top && q.top < p.bottom)
+      .filter(q => (q !== p || wrapWidth) && q.bottom > p.top && q.top < p.bottom &&
+        (q.left === p.right || (wrapWidth && q.left === p.right - wrapWidth)))
       .map(q => [Math.max(q.top, p.top), Math.min(q.bottom, p.bottom)]);
     subtractCoveredRanges(p.top, p.bottom, touchingRight)
       .forEach(([s, e]) => graphics.fillRect(p.right - BORDER_WIDTH, s, BORDER_WIDTH, e - s));
@@ -191,7 +214,11 @@ function drawPlatformOutlines(scene, platforms, color = 0x000000, alpha = BORDER
   return graphics;
 }
 
-export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
+// wrapSize ({width, height}) is only used by the decorative background renderer
+// (see PlatformBackground.js) to make edge outlines connect across the seam
+// where one repeated tile ends and the next begins. Real levels never pass this,
+// so it stays undefined and outline behavior for them is unchanged.
+export function createPlatforms(scene, levelPlatforms, levelBackgroundColor, wrapSize) {
   const platformsNormal = scene.physics.add.staticGroup();
   const platformsOneway = scene.physics.add.staticGroup();
   const platformsBreakable = scene.physics.add.staticGroup();
@@ -306,8 +333,8 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor) {
     }
   });
 
-  const platformOutlines = drawPlatformOutlines(scene, outlineCandidates);
-  const platformBounceOutlines = drawPlatformOutlines(scene, bounceOutlineCandidates, BOUNCE_OUTLINE_COLOR, BOUNCE_OUTLINE_ALPHA);
+  const platformOutlines = drawPlatformOutlines(scene, outlineCandidates, undefined, undefined, wrapSize?.width, wrapSize?.height);
+  const platformBounceOutlines = drawPlatformOutlines(scene, bounceOutlineCandidates, BOUNCE_OUTLINE_COLOR, BOUNCE_OUTLINE_ALPHA, wrapSize?.width, wrapSize?.height);
 
   return {
     platformsNormal,

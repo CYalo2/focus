@@ -271,6 +271,7 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.enemyBullets, this.platformsBreakable, (bullet, platform) => this.damagePlatform(bullet, platform, 1, BULLET_ENEMY_TINT));
     this.physics.add.collider(this.enemyBullets, this.platformsNormal, (b) => {
+      this.explodeBullet(b, null, BULLET_ENEMY_TINT);
       spawnBulletBreakParticles(this, b.x, b.y, BULLET_ENEMY_TINT);
       b.destroy();
     });
@@ -284,8 +285,14 @@ export class GameScene extends Phaser.Scene {
     // only ever get repositioned/re-aimed by redirectBullet() itself. Registered for
     // both bullet groups; the player and enemies are never checked against this group
     // at all, so they pass through unaffected.
-    this.physics.add.overlap(this.playerBullets, this.platformsRedirect, (bullet, area) => redirectBullet(bullet, area));
-    this.physics.add.overlap(this.enemyBullets, this.platformsRedirect, (bullet, area) => redirectBullet(bullet, area));
+    this.physics.add.overlap(this.playerBullets, this.platformsRedirect, (bullet, area) => {
+      redirectBullet(bullet, area);
+      this.flashRedirectPlatform(area);
+    });
+    this.physics.add.overlap(this.enemyBullets, this.platformsRedirect, (bullet, area) => {
+      redirectBullet(bullet, area);
+      this.flashRedirectPlatform(area);
+    });
 
     // --- other collisions ---
     this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => this.hitEnemy(bullet, enemy));
@@ -332,8 +339,15 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = false;
     // Bound via the keyboard plugin's own event, not polled in update(), so it still
     // fires the instant E is pressed even though update() bails out early while
-    // isPaused is true (which is what actually freezes gameplay).
-    this.input.keyboard.on("keydown-E", () => this.togglePause());
+    // isPaused is true (which is what actually freezes gameplay). Browsers fire
+    // repeated keydown events for a key held past the OS's key-repeat delay --
+    // event.repeat is only true for those synthetic repeats, not the initial press --
+    // so without this guard, holding E would toggle pause on and off over and over
+    // instead of just once.
+    this.input.keyboard.on("keydown-E", (event) => {
+      if (event.repeat) return;
+      this.togglePause();
+    });
     // Same reasoning for R -- bound via the keyboard event rather than polled, so it
     // still fires a quick retry even while paused, not just during live gameplay.
     // During live gameplay a bare keypress has nothing visible under the cursor to
@@ -347,6 +361,14 @@ export class GameScene extends Phaser.Scene {
       } else {
         this.retryLevelWithFlash();
       }
+    });
+    // SPACE also closes the pause menu, same as clicking RESUME -- bound via the
+    // keyboard event (not polled) for the same reason as E/R above: it needs to fire
+    // even while update() is bailing out early. No effect while not paused -- SPACE's
+    // jump input during live play comes from the polled this.keys.SPACE in
+    // Player.update, not this event, so this doesn't double up on jumping.
+    this.input.keyboard.on("keydown-SPACE", () => {
+      if (this.isPaused) this.resumeGame();
     });
   }
 
@@ -485,6 +507,12 @@ export class GameScene extends Phaser.Scene {
     if (CHEAT) return;
 
     if (this.gameEnded) return;
+    // excludeObj = this.player: the direct hit below already handles the player's
+    // death, so explodeBullet's own player-splash check (see explodeBullet) skips
+    // re-triggering it -- this call is just for the splash against any enemies/
+    // breakable platforms nearby, plus the expanding-circle visual. A no-op entirely
+    // if this bullet's weapon/enemy type isn't explodesOnHit.
+    this.explodeBullet(bullet, this.player, BULLET_ENEMY_TINT);
     spawnBulletBreakParticles(this, bullet.x, bullet.y, BULLET_ENEMY_TINT);
     bullet.destroy();
     this.cameras.main.flash(80, 200, 40, 40);
@@ -500,7 +528,7 @@ export class GameScene extends Phaser.Scene {
     if (!bullet.explodesOnHit) return;
 
     const { x, y, explosionRadius: radius, damage } = bullet;
-    this.spawnExplosionEffect(x, y, radius);
+    this.spawnExplosionEffect(x, y, radius, this.enemyBullets.contains(bullet) ? BULLET_ENEMY_TINT : undefined);
 
     // includeStatic must be true here -- breakable platforms live in a static physics
     // group, and overlapCirc excludes static bodies by default, which is why the splash
@@ -511,6 +539,14 @@ export class GameScene extends Phaser.Scene {
       if (!obj || obj === excludeObj || !obj.active) return;
 
       if (this.enemies.contains(obj)) {
+        // Splash-caught enemies get knocked back too, same as a direct hit -- but
+        // radiating outward from the explosion's center rather than along the
+        // bullet's travel direction, since each enemy in the blast sits at its own
+        // angle from that center. The directly-hit enemy (excludeObj) isn't touched
+        // here; it already got its own knockback from the bullet's travel angle in
+        // hitEnemy()/hitEnemyWithBeam() before this ever runs.
+        const knockbackAngle = Phaser.Math.Angle.Between(x, y, obj.x, obj.y);
+        obj.applyKnockback(knockbackAngle, bullet.knockbackScale !== undefined ? bullet.knockbackScale : 1);
         if (obj.hit(damage)) {
           spawnEnemyDeathParticles(this, obj.x, obj.y);
           obj.destroy();
@@ -520,6 +556,21 @@ export class GameScene extends Phaser.Scene {
       }
     });
 
+    // Enemy-fired explosions (blaster-type projectiles -- see EnemyTypes.js) also
+    // catch the player in their blast, even on a near-miss that only directly hit a
+    // platform or another enemy -- gated to this.enemyBullets specifically so the
+    // player's own explosive weapons (playerBullets) never hurt the player standing
+    // near their own blast. excludeObj still applies here too, so hitPlayer() below
+    // (which already handles a direct hit) doesn't double up with this splash check.
+    if (this.enemyBullets.contains(bullet) && this.player !== excludeObj
+      && this.player.active && !this.gameEnded && !CHEAT) {
+      const dist = Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y);
+      if (dist <= radius) {
+        this.cameras.main.flash(80, 200, 40, 40);
+        this.loseLevel();
+      }
+    }
+
     if (this.enemies.countActive(true) === 0 && this.physics.overlap(this.player, this.goal)) {
       this.winLevel();
     }
@@ -528,8 +579,9 @@ export class GameScene extends Phaser.Scene {
   // Instant hitscan fire for isBeam weapons (see Weapons.js) -- called from
   // Player.fireWeapon instead of createBullet(). Unlike a travelling bullet this
   // resolves everything in one step: find how far the beam reaches before a solid
-  // (normal/enemyPassthrough) platform stops it, then damage every breakable
-  // platform and every enemy it pierces through along the way, then draw the beam.
+  // (normal/enemyPassthrough/bounceable) platform stops it, then damage every
+  // breakable platform and every enemy it pierces through along the way, then draw
+  // the beam.
   // chargeRatio (0, 1]: how charged the shot was at release -- see
   // Player.getChargeRatio(). Defaults to 1 (fully charged) same as fireWeapon().
   fireBeamWeapon(player, pointer, chargeRatio = 1) {
@@ -543,12 +595,15 @@ export class GameScene extends Phaser.Scene {
     const dy = Math.sin(angle);
     const maxRange = weapon.beamRange || Math.hypot(this.worldBounds.width, this.worldBounds.height);
 
-    // How far the beam travels before something solid stops it -- same two groups a
-    // regular bullet collides-and-breaks against (platformsNormal,
-    // platformsEnemyPassthrough); everything else (breakable, bounceable, oneway,
-    // bulletPassthrough) never blocks it, matching how bullets already treat those.
+    // How far the beam travels before something solid stops it -- platformsNormal and
+    // platformsEnemyPassthrough are the two groups a regular bullet collides-and-breaks
+    // against; platformsBounceable is included too, but as a blocker rather than a
+    // reflector, since an instantly-resolved beam has no travel left to bounce
+    // mid-flight (same reasoning as fireEnemyBeam() below). Everything else
+    // (breakable, oneway, bulletPassthrough) never blocks it, matching how bullets
+    // already treat those.
     let beamLength = maxRange;
-    [this.platformsNormal, this.platformsEnemyPassthrough].forEach((group) => {
+    [this.platformsNormal, this.platformsEnemyPassthrough, this.platformsBounceable].forEach((group) => {
       group.children.iterate((platform) => {
         if (!platform || !platform.active) return;
         const t = this.raycastRect(originX, originY, dx, dy, platform.body);
@@ -615,6 +670,70 @@ export class GameScene extends Phaser.Scene {
     return tmin;
   }
 
+  // Instant hitscan fire for beam-type enemies (see EnemyTypes.js's isBeam entries),
+  // called from Enemy.shoot() instead of Enemy.fireBullet(). Mirrors fireBeamWeapon()
+  // above but simpler in one way: there's only ever one possible target (the player,
+  // not a whole pierceable group of enemies). Like fireBeamWeapon(), platformsBounceable
+  // is treated as blocking rather than reflecting -- bouncing a bullet is just giving
+  // its body a new velocity, but an instantly-resolved beam has no travel to bounce
+  // mid-flight, so a genuine reflection would need its own effect entirely. Treating
+  // it as solid instead keeps beam behavior a reasonable match for how a regular
+  // bullet would have been stopped at that same platform.
+  fireEnemyBeam(enemy, angle) {
+    const damage = enemy.beamDamage;
+    const originX = enemy.x;
+    const originY = enemy.y;
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+    const maxRange = enemy.beamRange || Math.hypot(this.worldBounds.width, this.worldBounds.height);
+
+    // How far the beam travels before something solid stops it. platformsNormal and
+    // platformsBounceable are the two groups a regular enemy bullet already collides
+    // (and stops/bounces) against -- see the enemyBullets colliders in create().
+    // platformsEnemyPassthrough, platformsOneway, and platformsBulletPassthrough
+    // never block enemy fire (no collider is registered for enemyBullets against any
+    // of them), so they're left out here too, for the same reason.
+    let beamLength = maxRange;
+    [this.platformsNormal, this.platformsBounceable].forEach((group) => {
+      group.children.iterate((platform) => {
+        if (!platform || !platform.active) return;
+        const t = this.raycastRect(originX, originY, dx, dy, platform.body);
+        if (t !== null && t < beamLength) beamLength = t;
+      });
+    });
+
+    // Pierce every breakable platform up to that stopping distance, damaging each
+    // one -- same as fireBeamWeapon(), the beam never stops or gets consumed by
+    // breakables, unlike a regular enemy bullet.
+    this.platformsBreakable.getChildren().slice().forEach((platform) => {
+      if (!platform || !platform.active) return;
+      const t = this.raycastRect(originX, originY, dx, dy, platform.body);
+      if (t !== null && t <= beamLength) {
+        this.damagePlatformAtPoint(originX + dx * t, originY + dy * t, platform, damage, BULLET_ENEMY_TINT);
+      }
+    });
+
+    // Only the player can be hit here -- unlike fireBeamWeapon(), there's no group of
+    // enemies to pierce through.
+    const t = this.raycastRect(originX, originY, dx, dy, this.player.body);
+    if (t !== null && t <= beamLength) {
+      this.hitPlayerWithBeam();
+    }
+
+    this.spawnBeamEffect(originX, originY, angle, beamLength, enemy.beamWidth || 4, 1, BULLET_ENEMY_TINT);
+  }
+
+  // Beam equivalent of hitPlayer() above -- called from fireEnemyBeam() when its
+  // raycast reaches the player. No bullet object exists here to destroy or spawn
+  // break particles at, so this is just the CHEAT/gameEnded guard and the actual
+  // death, shared with hitPlayer()'s tail end.
+  hitPlayerWithBeam() {
+    if (CHEAT) return;
+    if (this.gameEnded) return;
+    this.cameras.main.flash(80, 200, 40, 40);
+    this.loseLevel();
+  }
+
   // Brief rectangle flash along the beam's path -- fades out fast since the beam
   // itself is resolved instantly rather than travelling like a bullet.
   //
@@ -622,10 +741,14 @@ export class GameScene extends Phaser.Scene {
   // CHARGE_MIN_OPACITY the same way Player.fireWeapon scales a regular bullet's
   // alpha -- a barely-charged beam reads as noticeably fainter than a fully-charged
   // one, on top of dealing less damage/knockback.
-  spawnBeamEffect(x, y, angle, length, width, chargeRatio = 1) {
+  //
+  // color (default BULLET_PLAYER_TINT) lets non-player callers -- currently just
+  // fireEnemyBeam() -- draw their beam in a different tint (BULLET_ENEMY_TINT) so it
+  // reads as hostile fire rather than the player's own weapon.
+  spawnBeamEffect(x, y, angle, length, width, chargeRatio = 1, color = BULLET_PLAYER_TINT) {
     const baseOpacity = 0.9;
     const opacity = baseOpacity * (CHARGE_MIN_OPACITY + (1 - CHARGE_MIN_OPACITY) * chargeRatio);
-    const beam = this.add.rectangle(x, y, length, width, BULLET_PLAYER_TINT, opacity);
+    const beam = this.add.rectangle(x, y, length, width, color, opacity);
     beam.setOrigin(0, 0.5);
     beam.setRotation(angle);
     beam.setDepth(DEPTH.bullet);
@@ -652,9 +775,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   // Brief expanding, fading circle so an explosion actually reads as one rather than
-  // dealing invisible splash damage.
-  spawnExplosionEffect(x, y, radius) {
-    const circle = this.add.circle(x, y, radius, 0xffaa33, 0.5).setDepth(DEPTH.explosion);
+  // dealing invisible splash damage. color defaults to the player weapons' existing
+  // orange -- explodeBullet() below passes BULLET_ENEMY_TINT instead for enemy-fired
+  // explosions, so the two read as distinct at a glance.
+  spawnExplosionEffect(x, y, radius, color = 0xffaa33) {
+    const circle = this.add.circle(x, y, radius, color, 0.5).setDepth(DEPTH.explosion);
     this.tweens.add({
       targets: circle,
       scale: { from: 0.2, to: 1 },
@@ -729,6 +854,25 @@ export class GameScene extends Phaser.Scene {
     } else {
       spawnPlatformHitParticles(this, x, y);
     }
+  }
+
+  // Brief brighten-flash on a redirect platform, confirming it just redirected a
+  // bullet -- same setTintFill/delayedCall pattern as damagePlatformAtPoint's
+  // hit-flash above, minus the damage/particles since redirect platforms are
+  // indestructible and non-solid. platform.baseTint is set in createPlatforms()
+  // (redirect isn't a blend-texture type, so it gets a normal PLATFORM_TINTS
+  // tint + baseTint like 'normal'/'death'/etc platforms do). Reuses the same
+  // tintClearEvent cancel-and-reschedule guard as the other hit-flashes, so a
+  // bullet re-triggering the overlap while still passing through (or a second
+  // bullet arriving moments later) just extends the flash instead of letting an
+  // earlier clear cut a later one short.
+  flashRedirectPlatform(platform) {
+    platform.setTintFill(lightenColor(platform.baseTint, HIT_FLASH_BRIGHTEN_AMOUNT));
+    if (platform.tintClearEvent) this.time.removeEvent(platform.tintClearEvent);
+    platform.tintClearEvent = this.time.delayedCall(60, () => {
+      platform.tintClearEvent = null;
+      if (platform.active) platform.setTint(platform.baseTint);
+    });
   }
 
   // async because we wait on recordLevelCompletion() to learn whether this run beat

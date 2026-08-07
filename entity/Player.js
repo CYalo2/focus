@@ -226,11 +226,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   // collision separation uses, done manually since Arcade's version doesn't work for a
   // body with no tracked per-frame velocity (see the comment at its call site). Safe to
   // call any time the player might be embedded; a no-op if it isn't overlapping anything.
+  // Solid groups here mirror the player's real colliders against normal movement
+  // (normal, breakable, bounceable, enemyPassthrough, bulletPassthrough) -- oneway is
+  // intentionally excluded, same as it's already a soft collision from other directions.
   resolveEmbedding() {
     const scene = this.scene;
     const halfW = this.body.width / 2;
     const halfH = this.body.height / 2;
-    const groups = [scene.platformsNormal, scene.platformsBreakable, scene.platformsBounceable, scene.platformsEnemyPassthrough];
+    const groups = [scene.platformsNormal, scene.platformsBreakable, scene.platformsBounceable, scene.platformsEnemyPassthrough, scene.platformsBulletPassthrough];
     const bodies = scene.physics.overlapRect(this.x - halfW, this.y - halfH, this.body.width, this.body.height, false, true);
 
     for (const body of bodies) {
@@ -252,8 +255,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   // Checks whether the player's body would overlap a solid platform (normal, breakable,
-  // bounceable, or enemyPassthrough -- oneway is intentionally excluded, same as it's
-  // already a soft collision from other directions) if swept from (x0, y0) to (x1, y1).
+  // bounceable, enemyPassthrough, or bulletPassthrough -- oneway is intentionally excluded,
+  // same as it's already a soft collision from other directions) if swept from (x0, y0) to (x1, y1).
   // Used while dashing, since that moves the player by directly setting position/body
   // each frame rather than through velocity, so Phaser's normal collider resolution
   // never runs against it.
@@ -303,8 +306,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       return scene.platformsNormal.contains(obj)
         || scene.platformsBreakable.contains(obj)
         || scene.platformsBounceable.contains(obj)
-        || scene.platformsEnemyPassthrough.contains(obj);
+        || scene.platformsEnemyPassthrough.contains(obj)
+        || scene.platformsBulletPassthrough.contains(obj);
     });
+  }
+
+  // Whether the player's body would still be fully inside the physics world bounds
+  // at this x/y -- used alongside wouldSweepCollideAt() below so a dash treats the
+  // world edge the same way it treats a wall: position simply doesn't update past
+  // it, letting the same drag-based slow-down bring the dash to a stop there
+  // instead of relying on Arcade's own world-bounds collision, which can't run
+  // during a dash for the same reason resolveEmbedding() exists (see its comment):
+  // the body's real velocity is pinned at (0, 0) while dashing.
+  isWithinWorldBoundsX(x) {
+    const bounds = this.scene.physics.world.bounds;
+    const halfW = this.body.width / 2;
+    return x - halfW >= bounds.x && x + halfW <= bounds.right;
+  }
+
+  isWithinWorldBoundsY(y) {
+    const bounds = this.scene.physics.world.bounds;
+    const halfH = this.body.height / 2;
+    return y - halfH >= bounds.y && y + halfH <= bounds.bottom;
   }
 
   finishDash() {
@@ -382,11 +405,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       // precisely) and as a symmetric shrink on the other, non-moving axis (so merely
       // resting against a surface perpendicular to this move -- e.g. standing on the
       // ground while checking a purely horizontal step -- doesn't block it either).
-      if (!this.wouldSweepCollideAt(this.x, this.y, targetX, this.y, DASH.skin, DASH.skin)) {
+      if (!this.wouldSweepCollideAt(this.x, this.y, targetX, this.y, DASH.skin, DASH.skin) && this.isWithinWorldBoundsX(targetX)) {
         this.x = targetX;
       }
 
-      if (!this.wouldSweepCollideAt(this.x, this.y, this.x, targetY, DASH.skin, DASH.skin)) {
+      if (!this.wouldSweepCollideAt(this.x, this.y, this.x, targetY, DASH.skin, DASH.skin) && this.isWithinWorldBoundsY(targetY)) {
         this.y = targetY;
       }
     }

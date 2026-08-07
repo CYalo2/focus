@@ -1,4 +1,4 @@
-import { GRAVITY } from "./data/Constants.js";
+import { GRAVITY, BACKGROUND_COLOR } from "./data/Constants.js";
 
 import { BootScene } from "./scenes/BootScene.js";
 import { MenuScene } from "./scenes/MenuScene.js";
@@ -13,7 +13,7 @@ const config = {
 
     parent: "game-container",
 
-    backgroundColor: "#1a1a22",
+    backgroundColor: BACKGROUND_COLOR,
 
     pixelArt: true,
 
