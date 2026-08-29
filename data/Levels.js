@@ -11,7 +11,8 @@ export const LEVELS = [
             x: 50,
             y: 550
         },
-        timeLimitMs: 300000,
+        timeLimitMs: 150000,
+        challengeTimeMs: 8000,
         platforms: [
             { x1: 0, y1: 600, x2: 3000, y2: 760, type: "normal" },
 
@@ -45,6 +46,7 @@ export const LEVELS = [
         open: true,
         backgroundColor: 0x6b88be,
         music: "uplifting",
+        hintReplay: {"seed":"mspigwy7","frames":"145,2|av,6|3b,2|h,y,-1e|1w,y|iw,2|5o,6|fl,2|h,y,-8|1w,y|bt,2|h,a|bs,q|1w,i|h,2,5|7k,2|4q,6|y,m|cr,i|h,2,f|e6,2|2u,6|1w,2|bt,i|h,2,y|8z,2|f4,i|h,0,2c|gj,0"}
     },
     {
         name: "Perspicacious",
@@ -57,6 +59,7 @@ export const LEVELS = [
             y: 550
         },
         timeLimitMs: 150000,
+        challengeTimeMs: 15000,
         platforms: [
             { x1: 0, y1: 600, x2: 600, y2: 900, type: "normal" },
             { x1: 600, y1: 850, x2: 1100, y2: 900, type: "normal" },
@@ -150,6 +153,7 @@ export const LEVELS = [
         open: true,
         backgroundColor: 0x4191a7,
         music: "uplifting",
+        hintReplay: {"seed":"mslze0zg","frames":"x2,2|3b,6|2d,2|d8,i|h,2,1z|2d,2|9x,i|h,2,2e|3b,2|h,y,-10|2u,y|id,2|gj,i|h,2,1g|1w,2|d8,i|h,2,29|57,2|ca,i|2d,g|h,0,-u|1w,0|a9,g|h,0,-u|1w,0|aa,g|h,0,-u|1l,0|65,2|k8,0|54,4|2g,0|8,w,-f|24,w|49,0|jd,g|h,0,16|2d,0|dp,g|h,0,-7|1f,0|cr,g|h,0,-9|20,0|cx,g|4q,i|h,2,-4o|iw,2|d8,i|h,2,-3e|1f,2|73,i|6m,g|h,0,-3q|y,0|cr,g|h,0,-3p|2d,0|1f,2|5o,6|57,4|h,10,-37|h,10|2d,11|57,5|4q,1|h,0"}
     },
     {
         name: "Malleable",
@@ -162,6 +166,7 @@ export const LEVELS = [
             y: 650
         },
         timeLimitMs: 50000,
+        challengeTimeMs: 10000,
         platforms: [
             { x1: 0, y1: 670, x2: 1280, y2: 720, type: "normal" },
             { x1: 40, y1: 60, x2: 140, y2: 90, type: "breakable", health: 5 },
@@ -281,6 +286,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x997e71,
         music: "rebuttal",
+        hintReplay: {"seed":"mstn5y3z","frames":"ca,0|hy,g|h,0,-2i|3b,0|hy,g|h,0,-2r|3s,0|hh,g|h,0,-29|3s,0|gj,g|h,0,-20|av,0|fl,g|h,0,-30|5o,0|g2,g|h,0,-38|57,0|h0,g|h,0,-1s|4q,0|hh,g|h,0,-1l|2u,0|hh,g|h,0,-3f|2d,0|g2,g|h,0,-3l|49,0|if,g|h,0,-1f|4q,0|jd,g|h,0,-1a|2d,0|kb,g|h,0,-3q|h,0"}
     },
     {
         name: "Concomitant",
@@ -293,6 +299,7 @@ export const LEVELS = [
             y: 990
         },
         timeLimitMs: 60000,
+        challengeTimeMs: 8000,
         platforms: [
             { x1: 100, y1: 0, x2: 1180, y2: 50, type: "normal" },
             { x1: 100, y1: 50, x2: 490, y2: 100, type: "normal" },
@@ -413,6 +420,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0xa88989,
         music: "barrage",
+        hintReplay: {"seed":"msl68a4i","frames":"mo,0|h,w,-2l|1w,w|2u,0|n5,g|h,0,50|1d4,0|h,w,-2h|1w,w|2u,0|p1,g|h,0,-1|n5,0|h,w,-2l|1w,w|2u,0|lq,g|h,0,1|1w,0|lq,g|h,0,0|1f,0|ks,g|h,0,0|1f,0|qw,g|h,0,4z|y,0|m7,g|h,0,-50|y,0|l9,g|h,0,50|h,0"}
     },
     {
         name: "Oblique",
@@ -425,6 +433,7 @@ export const LEVELS = [
             y: 670
         },
         timeLimitMs: 90000,
+        challengeTimeMs: 8000,
         platforms: [
             { x1: 0, y1: 0, x2: 480, y2: 30, type: "bounceable" },
             { x1: 480, y1: 0, x2: 630, y2: 30, type: "normal" },
@@ -481,6 +490,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x91a47e,
         music: "rebuttal",
+        hintReplay: {"seed":"msl6a9ml","frames":"1f,0|gj,g|h,0,-1d|1f,0|en,g|h,0,-1d|1f,0|en,g|h,0,-1d|1w,0|en,g|h,0,-1c|1f,0|g2,g|h,0,-1c|gy,0|1s,1|8,0|nl,2|h,y,-a|3b,y|1f,2|49,i|ca,g|h,0,-y|y,0|bt,g|h,0,-w|1f,0|ca,g|h,0,-v|1f,0|br,g|h,0,-v|1w,0|cn,g|h,0,-s|e6,0|81,1|h,x,-4y|2u,x|2u,1|h,0"}
     },
     {
         name: "Synthesis",
@@ -493,6 +503,7 @@ export const LEVELS = [
             y: 550
         },
         timeLimitMs: 95000,
+        challengeTimeMs: 35000,
         platforms: [
             { x1: 0, y1: 600, x2: 870, y2: 750, type: "normal" },
 
@@ -672,6 +683,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x304993,
         music: "counter",
+        hintReplay: {"seed":"msnpnktp","frames":"11k,2|8i,6|81,2|h,y,-u|2d,y|73,2|8z,i|3s,g|h,0,2h|1f,0|ae,g|h,0,2g|1w,0|9x,g|y,i|h,2,2g|at,2|h,y,-m|2u,y|8i,2|49,i|65,g|h,0,2e|2d,0|9g,g|h,0,2e|1f,0|9g,g|y,i|h,2,2e|7z,2|h,y,-t|2d,y|9x,2|3b,i|7k,g|2d,o|h,8,2s|3s,8|ae,o|2d,q|3s,i|h,2,9|w,2|2d,i|9x,g|h,0,-9|1f,0|e6,g|h,0,-5|y,0|73,2|80,i|4q,g|h,0,-2y|1f,0|8i,g|h,0,-2y|1f,0|bc,g|h,0,-2u|1f,0|57,2|2u,i|8z,g|h,0,-1q|1f,0|9g,g|h,0,-1q|y,0|4q,2|5o,i|ad,g|h,0,-2k|1f,0|9g,g|h,0,-2g|y,0|bc,g|h,0,-2f|1f,0|8z,g|3b,h|1w,g|h,0,-2o|y,0|8z,g|h,0,-2p|1f,0|81,g|h,0,-2r|2d,0|ae,g|h,0,-2q|3b,0|3b,g|6m,h|h,1,-2p|h,1|2d,0|hy,g|h,0,-2v|y,0|9x,g|h,0,-2v|h,0|1w,2|3s,i|9g,g|h,0,-2d|1f,0|9x,g|h,0,-2a|y,0|1f,2|8z,6|h,12,-25|2u,12|h,6|3b,2|dn,0|65,2|1f,i|d8,g|h,0,0|w,0|e6,g|h,0,2|1f,0|4m,g|65,o|h,8,0|h,8|1w,a|81,2|h,y,-1x|3b,y|5o,2|fl,g|h,0,4|19b,2|81,i|1w,g|3s,h|h,1,-1f|2u,1|1f,0|8x,2|2u,i|bt,g|h,0,-1d|41,0|5x,2|4q,i|8z,g|h,0,-1a|w,0|av,g|h,0,-1e|2d,0|ae,g|h,0,-1d|1w,0|9g,g|h,0,-1e|m7,0|73,2|17,0|f0,1|h,4|65,2|1f,0|ca,2|h,y,-3|2u,y|57,2|bs,i|h,2,-12|1f,2|1f,i|8i,g|h,0,-16|2w,0|cs,g|h,0,-14|y,0|4b,g|9x,i|h,2,-15|kb,2|gz,0|h,x,-4x|3s,x|cw,1"}
     },
 
     {
@@ -684,7 +696,8 @@ export const LEVELS = [
             x: 200,
             y: 520
         },
-        timeLimitMs: 60000,
+        timeLimitMs: 25000,
+        challengeTimeMs: 10000,
         platforms: [
             { x1: 0, y1: 710, x2: 2000, y2: 720, type: "death" },
 
@@ -731,6 +744,7 @@ export const LEVELS = [
         open: true,
         backgroundColor: 0x3f2f40,
         music: "alacrity",
+        hintReplay: {"seed":"msm9z2e3","frames":"3s,i|1w,2|65,6|px,2|w,3|14,1|5c,0|8,4|5e,6|hh,2|h,y,-k|3b,y|f5,2|6u,i|e6,g|h,0,-3y|1l,0|2g,2|5k,0|1s,h|dc,g|8,0,-l|3c,0|14,1|4v,h|av,g|h,0,-f|8z,0|f4,g|h,0,-f|ae,0|49,1|5o,5|cr,1|h,x,-4u|3b,x|if,1|3s,5|5o,1|2u,x|h,x,3y|65,x|h,0"}
     },
     {
         name: "Transmute",
@@ -743,6 +757,7 @@ export const LEVELS = [
             y: 1210
         },
         timeLimitMs: 120000,
+        challengeTimeMs: 23000,
         platforms: [
             { x1: 0, y1: 0, x2: 800, y2: 50, type: "normal" },
             { x1: 0, y1: 50, x2: 50, y2: 1400, type: "normal" },
@@ -859,6 +874,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x623569,
         music: "barrage",
+        hintReplay: {"seed":"msl7sbwy","frames":"2d,g|y,0|cr,g|h,0,-j|y,0|bt,g|h,0,-j|1w,0|bt,g|h,0,-i|2d,0|h,2|49,6|1w,m|5o,k|65,g|h,0,1a|1f,0|9g,g|h,0,z|73,0|2u,4|1f,6|h,m|57,k|73,g|h,0,1d|y,0|9x,g|h,0,12|5o,0|ju,g|h,0,-33|1w,0|bc,g|h,0,-33|1f,0|bt,g|h,0,-33|1w,0|c6,g|h,0,-1z|1w,0|ae,g|h,0,-20|h,g|1w,0|dp,g|h,0,-20|2d,0|jd,g|h,0,2|2d,0|d8,g|h,0,2|h,0|en,g|h,0,2|3b,0|h,2|3b,6|bt,2|h,y,-l|2u,y|6m,2|65,0|y,1|57,5|h,4|1w,6|y,m|9x,i|y,g|h,0,-47|1f,0|a4,g|h,0,-3r|1f,0|a6,g|h,0,-3p|1f,0|4u,1|57,5|h,4|2u,6|y,2|7k,i|65,g|h,0,-3x|1f,0|f4,g|h,0,-3m|h,g|73,0|h,4|9x,6|h,4|5o,5|2d,4|h,10,-2g|2u,10|1f,4|1f,6|3b,2|73,i|7k,g|h,0,2|1f,0|f4,g|h,0,-2|h,0|gj,g|h,0,1|gj,0|9f,1|h,x,-40|3s,x|8z,1|c5,0|g,4|hi,5|8o,6|g,4|3y,5|er,l|28,h|8,j|8,2,-2r|6g,2|h,0"}
     },
     {
         name: "Viscous",
@@ -871,6 +887,7 @@ export const LEVELS = [
             y: 120
         },
         timeLimitMs: 45000,
+        challengeTimeMs: 22000,
         platforms: [
             { x1: 0, y1: 0, x2: 1280, y2: 50, type: "normal" },
             { x1: 0, y1: 50, x2: 50, y2: 1050, type: "normal" },
@@ -988,6 +1005,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x49567b,
         music: "rebuttal",
+        hintReplay: {"seed":"msl8vipd","frames":"5h,0|49,8|av,g|h,0,f|1f,0|bt,g|h,0,f|1w,0|9g,g|h,0,f|1w,0|d8,g|h,0,p|y,0|bc,g|h,0,p|y,0|bc,g|h,0,p|2d,0|h,4|4q,5|81,1|cr,0|av,2|3s,a|y,2|3b,0|ej,g|h,0,4l|1w,0|av,g|h,0,4l|1f,0|9x,g|h,0,4l|65,0|3b,g|y,0|6m,4|bt,0|49,8|h,0|98,g|h,0,4a|1f,0|av,g|h,0,4a|1w,0|bc,g|h,0,4a|3b,0|y,2|4q,6|dp,2|ks,0|bt,1|49,9|y,b|ju,a|2u,8|7k,0|9g,2|8z,0|sc,1|2u,9|y,8|3s,0|f4,g|h,0,4o|1w,0|av,g|h,0,4n|1f,0|av,g|h,0,4n|3b,0|h,4|49,6|4q,2|h0,a|y,b|4q,9|iw,1|y,0|9c,g|h,0,49|1w,0|9v,g|h,0,4a|49,0|9x,g|h,0,4a|h,0|bt,2|3b,0|hh,1|3b,9|1w,1|1w,h|9v,g|h,0,e|1w,0|9v,g|h,0,e|1w,0|9x,g|h,0,e|2d,0|y,4|57,5|7k,1|cr,9|h,b|2u,a|en,2|2d,i|9x,g|h,0,p|1f,0|9c,g|h,0,p|1f,0|av,g|h,0,p|57,0|h,2|bt,6|49,4|h,10,-2w|49,10|1w,4|2u,6|h,0"}
     },
     {
         name: "Oscillate",
@@ -1000,6 +1018,7 @@ export const LEVELS = [
             y: 340
         },
         timeLimitMs: 60000,
+        challengeTimeMs: 12000,
         platforms: [
             { x1: 0, y1: 0, x2: 1800, y2: 30, type: "bounceable" },
             { x1: 0, y1: 690, x2: 1800, y2: 720, type: "bounceable" },
@@ -1166,6 +1185,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x87966f,
         music: "rebuttal",
+        hintReplay: {"seed":"msl97xy4","frames":"3s,g|h,0|ca,g|h,0,-4b|y,0|av,g|h,0,-4l|1f,0|bc,g|h,0,-4v|y,0|bt,g|h,0,4w|1f,0|bt,g|h,0,4p|1w,0|ba,g|h,0,4i|1f,0|b8,g|h,0,4b|1f,0|1w,2|2u,6|p1,2|h,y,-q|2u,y|5o,2|y,i|cr,g|h,0,-o|y,0|cr,g|h,0,-h|1f,0|d8,g|h,0,-5|y,0|d8,g|h,0,3|1f,0|d8,g|h,0,d|57,1|4q,5|2d,4|2d,0|57,1|h,0|g2,2|3b,i|dp,g|h,0,m|1f,0|bt,g|h,0,s|fl,0"}
     },
     {
         name: "Destitute",
@@ -1177,7 +1197,8 @@ export const LEVELS = [
             x: 640,
             y: 600
         },
-        timeLimitMs: 180000,
+        timeLimitMs: 90000,
+        challengeTimeMs: 30000,
         platforms: [
             { x1: 0, y1: 0, x2: 1280, y2: 50, type: "normal" },
             { x1: 0, y1: 50, x2: 90, y2: 1150, type: "normal" },
@@ -1363,6 +1384,7 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x765661,
         music: "barrage",
+        hintReplay: {"seed":"msm7yvsz","frames":"2x,0|10,4|2v,6|h,m,-1k|1w,m|y,i|gz,g|h,g,-3x|2u,g|81,h|8z,g|h,g,4|2u,g|6m,i|ae,g|h,g,-30|5o,g|9g,h|4q,g|h,g,-1c|ju,g|h,g,-1c|ju,g|h,g,-1b|73,g|7k,i|57,g|h,g,2f|bc,g|b0,0|h,4|h,5|h,l,2d|2d,l|1w,5|d8,1|2u,0|h,g,-7|ju,g|h,g,-6|ju,g|h,g,-4l|jt,g|h,g,-4n|y,g|5o,i|h,2|h,i|8z,2|6z,0|h,g,u|ju,g|h,g,-14|9g,g|49,0|2u,g|2u,i|h,i,-3t|73,i|f3,2|57,0|h,w,-33|1w,w|2g,0|h,g,4s|7k,g|81,0|49,g|h,g,-2|57,g|g7,0|h,w,-2n|3b,w|65,0|3s,2|h,0|h,g,y|ju,g|h,g,-1|6m,g|fl,0|h,w,-2m|3b,w|y,10|3b,4|4q,5|y,4|65,0|h,g,4m|h0,g|2u,i|h,i,-4t|y,i|h0,2|1w,y|h,y,-2o|1w,y|4q,w|2u,0|3s,1|2u,0|h,g,4f|8i,g|av,0|3s,2|gj,0|h,w,-2k|3s,w|h,0|6m,1|h,3|4q,2|1f,0|1f,1|h,h,k|1f,h|if,g|h,g,-a|1w,g|2d,0|49,2|72,0|49,w|h,w,-2e|2u,w|1f,4|3s,5|h,4|1f,5|h,1|1w,0|h,g,g|if,g|1f,i|h,i,-9|65,i|y,2|cr,0|h,w,-1j|5o,w|1w,0|8i,1|3b,0|h,g,4t|ju,g|h,g,-4u|5o,g|49,0|9x,2|h,y,-2r|7k,y|h,2|y,0|6m,1|9x,0|2d,4|h,k,2u|2u,k|49,4|cr,10|h,10,-2e|h,0"}
     },
     {
         name: "Obstreperous",
@@ -1375,6 +1397,7 @@ export const LEVELS = [
             y: 420
         },
         timeLimitMs: 135000,
+        challengeTimeMs: 50000,
         platforms: [
             { x1: 0, y1: 610, x2: 1810, y2: 620, type: "death" },
 
@@ -1682,7 +1705,8 @@ export const LEVELS = [
         weapon: "blaster",
         open: false,
         backgroundColor: 0x6fb6b3,
-        music: "counter2",
+        music: "counter2",//                         1                                                                                                   dash                       snipe                                                                        bottom                          middle                                                     dash                 boost                           side 1                                                              boost                 dash              side 2                                                                                                 dash                                    bounce 3             6                                   7                                  break                                                                                                                                stuff
+        hintReplay: {"seed":"msmajyen","frames":"h,0|k,g,-o|jo,g|h,g,-o|if,g|1f,i|h,i,-o|3s,i|h,2|h,i|81,2|y,3|49,1|6m,0|7c,2|h,y,-q|3b,y|c0,2|4q,6|g6,2|h,y,-c|3b,y|c5,2|be,0|8f,2|h,g,1j|2u,g|cr,0|cl,2|e4,0|8i,1|3s,5|rh,1|1x,0|2w,1|6n,0|34,8|4u,0|5m,2|99,1|h,g,-1|1f,g|1f,h|l0,1|6n,0|5u,2|h,g,-1i|fr,g|49,i|h,i,-1j|ju,i|h,i,-1y|73,i|q2,2|6m,6|ax,2|h,y,-m|2u,y|jd,2|h,6|h,m,2e|2u,m|1w,6|5m,2|65,i|2d,g|h,g,-f|ju,g|h,g,-i|e6,g|3b,i|d,q|20,g|h,q,-k|u,q|7o,o|3b,8|x,2|7g,6|h,k,2g|1w,k|50,1|t3,4|h,10,-2i|j,2|5o,0|h,g,-r|2u,g|h,0|6m,a|2n,8|da,0|2u,4|2d,5|y,7|y,6|1n,2|h,i,-q|y,i|cr,q|65,i|h,i,-15|ju,i|36,2|7k,6|7k,2|h,y,3|2d,y|4q,2|w,0|1s,1|54,0|1c,2|20,0|8,g,5|1u,g|bc,0|5b,1|8,h,9|1k,1|bh,2|c0,0|24,4|54,1|20,0|8,g,y|1k,g|2v,0|bc,2|bk,8|a0,0|g,1|8,g,-16|1k,g|un,0|h,g,-16|2d,g|ca,0|2u,2|h,i|1w,g|h,g,1|3s,g|cr,0|3s,2|3b,0|h,g,4u|3s,g|h,0|y,g|ca,0|2d,g|h,g,4w|65,g|1w,h|hq,1|49,h|h,h,1j|6m,h|gk,1|5o,x|h,w,-2u|65,w|49,0|81,2|h,i,16|ju,g|h,g,3|5o,g|2u,i|4q,2|6m,y|h,y,-6|y,y|h,0"}
     },
 
     {
@@ -1696,6 +1720,7 @@ export const LEVELS = [
             y: 640
         },
         timeLimitMs: 15000,
+        challengeTimeMs: 6000,
         platforms: [
             { x1: 95, y1: 710, x2: 1185, y2: 720, type: "death" },
 
@@ -1753,6 +1778,7 @@ export const LEVELS = [
             y: 200
         },
         timeLimitMs: 60000,
+        challengeTimeMs: 16000,
         platforms: [
             { x1: 440, y1: 220, x2: 840, y2: 250, type: "oneway" },
             { x1: 540, y1: 250, x2: 740, y2: 280, type: "bounceable" },
@@ -1810,7 +1836,7 @@ export const LEVELS = [
         },
         weapon: "beam",
         open: true,
-        backgroundColor: 0xeca6ff,
+        backgroundColor: 0xb87fc7,
         music: "alacrity",
     },
     {
@@ -1824,6 +1850,7 @@ export const LEVELS = [
             y: 670
         },
         timeLimitMs: 60000,
+        challengeTimeMs: 12000,
         platforms: [
             { x1: 0, y1: 0, x2: 30, y2: 720, type: "normal" },
             { x1: 30, y1: 690, x2: 2030, y2: 720, type: "normal" },
@@ -1868,7 +1895,7 @@ export const LEVELS = [
                 type: "blaster",
                 projectileSpeed: 1200,
                 affectedByGravity: false,
-                explosionDamage: 0,
+                hitsBreakable: false,
             },
             {
                 x: 1330,
@@ -1879,7 +1906,7 @@ export const LEVELS = [
                 type: "blaster",
                 projectileSpeed: 1200,
                 affectedByGravity: false,
-                explosionDamage: 0,
+                hitsBreakable: false,
                 leftDist: -50,
             },
         ],
@@ -1888,8 +1915,223 @@ export const LEVELS = [
             y: 100
         },
         weapon: "blaster",
-        open: true,
+        open: false,
         backgroundColor: 0xc8d18b,
+        music: "rebuttal",
+    },
+    {
+        name: "Remiss",
+        worldBounds: {
+            width: 1890,
+            height: 720
+        },
+        playerSpawn: {
+            x: 140,
+            y: 600
+        },
+        timeLimitMs: 55000,
+        challengeTimeMs: 30000,
+        platforms: [
+            { x1: 0, y1: 620, x2: 280, y2: 720, type: "normal" },
+            { x1: 280, y1: 620, x2: 500, y2: 650, type: "breakable", health: 1 },
+            { x1: 280, y1: 690, x2: 500, y2: 720, type: "normal" },
+            { x1: 500, y1: 110, x2: 530, y2: 670, type: "bounceable" },
+            { x1: 530, y1: 110, x2: 700, y2: 140, type: "bounceable" },
+            { x1: 530, y1: 320, x2: 700, y2: 350, type: "breakable", health: 1 },
+            { x1: 700, y1: 260, x2: 920, y2: 290, type: "breakable", health: 3 },
+            { x1: 700, y1: 200, x2: 1150, y2: 230, type: "breakable", health: 1 },
+            { x1: 500, y1: 670, x2: 1150, y2: 720, type: "normal" },
+            { x1: 1150, y1: 40, x2: 1180, y2: 720, type: "normal" },
+            { x1: 1090, y1: 0, x2: 1120, y2: 140, type: "enemyPassthrough" },
+            { x1: 1210, y1: 0, x2: 1300, y2: 300, type: "normal" },
+            { x1: 1210, y1: 340, x2: 1240, y2: 720, type: "normal" },
+            { x1: 1180, y1: 710, x2: 1210, y2: 720, type: "death" },
+            { x1: 1270, y1: 300, x2: 1300, y2: 610, type: "normal" },
+
+            { x1: 1240, y1: 650, x2: 1890, y2: 720, type: "normal" },
+            { x1: 1330, y1: 70, x2: 1360, y2: 650, type: "bounceable" },
+            { x1: 1300, y1: 0, x2: 1860, y2: 30, type: "bounceable" },
+            { x1: 1360, y1: 620, x2: 1860, y2: 650, type: "bounceable" },
+            { x1: 1860, y1: 0, x2: 1890, y2: 650, type: "bounceable" },
+            { x1: 1460, y1: 90, x2: 1760, y2: 120, type: "breakable", health: 10 },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 390,
+                y: 670,
+                type: "turret",
+                health: 1,
+                accuracy: 1,
+                shootCooldownMs: 2500,
+                initialCooldownMs: 1250,
+                angleDeg: 270,
+                affectedByGravity: true,
+            },
+            {
+                x: 1100,
+                y: 600,
+                shootCooldownMs: 500,
+                health: 5,
+                accuracy: 1,
+                type: "default",
+                affectedByGravity: false,
+                projectileSpeed: 900,
+                leftDist: 600,
+            },
+            {
+                x: 1225,
+                y: 320,
+                type: "turret",
+                health: 1,
+                accuracy: 1,
+                shootCooldownMs: 800,
+                angleDeg: 180,
+                affectedByGravity: false,
+                leftDist: 725,
+            },
+            {
+                x: 1610,
+                y: 570,
+                type: "default",
+                health: 5,
+                accuracy: 0.3,
+                shootCooldownMs: 2000,
+                affectedByGravity: true,
+                projectileSpeed: 500,
+                projectileCount: 3,
+                leftDist: 375,
+            },
+        ],
+        goal: {
+            x: 1610,
+            y: 590
+        },
+        weapon: "default",
+        open: true,
+        backgroundColor: 0x88c7ae,
+        music: "rebuttal",
+    },
+    {
+        name: "Remiss",
+        worldBounds: {
+            width: 1280,
+            height: 1270
+        },
+        playerSpawn: {
+            x: 640,
+            y: 360
+        },
+        timeLimitMs: 55000,
+        challengeTimeMs: 30000,
+        platforms: [
+            { x1: 0, y1: 190, x2: 275, y2: 1270, type: "normal" },
+            { x1: 1005, y1: 190, x2: 1280, y2: 1270, type: "normal" },
+            { x1: 0, y1: 0, x2: 1280, y2: 190, type: "normal" },
+            { x1: 625, y1: 190, x2: 655, y2: 200, type: "death" },
+            { x1: 625, y1: 380, x2: 655, y2: 410, type: "oneway" },
+            { x1: 595, y1: 190, x2: 625, y2: 380, type: "enemyPassthrough" },
+            { x1: 655, y1: 190, x2: 685, y2: 380, type: "enemyPassthrough" },
+            { x1: 595, y1: 380, x2: 625, y2: 410, type: "normal" },
+            { x1: 655, y1: 380, x2: 685, y2: 410, type: "normal" },
+            { x1: 595, y1: 410, x2: 625, y2: 480, type: "bulletPassthrough" },
+            { x1: 655, y1: 410, x2: 685, y2: 480, type: "bulletPassthrough" },
+
+            { x1: 505, y1: 540, x2: 775, y2: 550, type: "death" },
+            { x1: 505, y1: 550, x2: 775, y2: 580, type: "normal" },
+            { x1: 505, y1: 580, x2: 775, y2: 610, type: "bounceable" },
+            { x1: 275, y1: 410, x2: 475, y2: 580, type: "normal" },
+            { x1: 805, y1: 410, x2: 1005, y2: 580, type: "normal" },
+            { x1: 275, y1: 580, x2: 445, y2: 1270, type: "normal" },
+            { x1: 835, y1: 580, x2: 1005, y2: 1270, type: "normal" },
+            { x1: 445, y1: 580, x2: 475, y2: 1250, type: "bounceable" },
+            { x1: 805, y1: 580, x2: 835, y2: 1250, type: "bounceable" },
+            { x1: 305, y1: 400, x2: 475, y2: 410, type: "death" },
+            { x1: 805, y1: 400, x2: 975, y2: 410, type: "death" },
+            { x1: 275, y1: 240, x2: 305, y2: 410, type: "normal" },
+            { x1: 975, y1: 240, x2: 1005, y2: 410, type: "normal" },
+
+            { x1: 475, y1: 1220, x2: 805, y2: 1250, type: "bounceable" },
+            { x1: 445, y1: 1250, x2: 835, y2: 1270, type: "normal" },
+
+            { x1: 505, y1: 1150, x2: 535, y2: 1180, type: "normal" },
+            { x1: 745, y1: 1150, x2: 775, y2: 1180, type: "normal" },
+            { x1: 590, y1: 1020, x2: 690, y2: 1050, type: "enemyPassthrough" },
+            { x1: 590, y1: 970, x2: 620, y2: 1020, type: "enemyPassthrough" },
+            { x1: 660, y1: 970, x2: 690, y2: 1020, type: "enemyPassthrough" },
+        ],
+        texts: [
+        ],
+        enemies: [
+            {
+                x: 980,
+                y: 220,
+                shootCooldownMs: 3000,
+                initialCooldownMs: 2000,
+                health: 1,
+                accuracy: 0.9,
+                type: "blaster",
+                projectileSpeed: 300,
+                affectedByGravity: true,
+                hitsBreakable: false,
+            },
+            {
+                x: 300,
+                y: 220,
+                shootCooldownMs: 3000,
+                initialCooldownMs: 2000,
+                health: 1,
+                accuracy: 0.9,
+                type: "blaster",
+                projectileSpeed: 300,
+                affectedByGravity: true,
+                hitsBreakable: false,
+            },
+            {
+                x: 470,
+                y: 390,
+                shootCooldownMs: 3000,
+                initialCooldownMs: 1000,
+                health: 1,
+                accuracy: 0.9,
+                type: "blaster",
+                projectileSpeed: 300,
+                affectedByGravity: true,
+                hitsBreakable: false,
+            },
+            {
+                x: 810,
+                y: 390,
+                shootCooldownMs: 3000,
+                initialCooldownMs: 1000,
+                health: 1,
+                accuracy: 0.9,
+                type: "blaster",
+                projectileSpeed: 300,
+                affectedByGravity: true,
+                hitsBreakable: false,
+            },
+            {
+                x: 640,
+                y: 980,
+                shootCooldownMs: 1000,
+                health: 3,
+                accuracy: 0.7,
+                type: "blaster",
+                projectileSpeed: 300,
+                affectedByGravity: true,
+                projectileCount: 2,
+                hitsBreakable: false,
+            },
+        ],
+        goal: {
+            x: 640,
+            y: 1190
+        },
+        weapon: "default",
+        open: false,
+        backgroundColor: 0x4992a7,
         music: "rebuttal",
     },
 ];

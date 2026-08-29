@@ -34,7 +34,6 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     // falls back to the world's full diagonal in GameScene.fireEnemyBeam(), same as
     // the player beam weapon's own beamRange fallback.
     this.isBeam = config.isBeam !== undefined ? config.isBeam : (typeDefaults.isBeam || false);
-    this.beamDamage = config.beamDamage !== undefined ? config.beamDamage : typeDefaults.beamDamage;
     this.beamRange = config.beamRange !== undefined ? config.beamRange : typeDefaults.beamRange;
     this.beamWidth = config.beamWidth !== undefined ? config.beamWidth : typeDefaults.beamWidth;
     // Fixed firing direction, in degrees -- if set (by config or the type's own
@@ -43,21 +42,17 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     // which is exactly what keeps them aiming at the player.
     this.angleDeg = config.angleDeg !== undefined ? config.angleDeg : typeDefaults.angleDeg;
 
-    // Explosive projectiles -- reuses GameScene's existing explodesOnHit/
-    // explosionRadius/damage bullet system (see fireBullet() below and
-    // GameScene.explodeBullet()), the same one the player's own explosive weapons
-    // use. explodesOnHit left undefined/false (every type except 'blaster') means
-    // fireBullet() creates a plain bullet exactly as before, so explosionRadius/
-    // explosionDamage are simply unused in that case.
     this.explodesOnHit = config.explodesOnHit !== undefined ? config.explodesOnHit : (typeDefaults.explodesOnHit || false);
     this.explosionRadius = config.explosionRadius !== undefined ? config.explosionRadius : typeDefaults.explosionRadius;
-    this.explosionDamage = config.explosionDamage !== undefined ? config.explosionDamage : typeDefaults.explosionDamage;
 
     // Velocity (px/s) applied away from an incoming hit's direction when a player
     // projectile hits this enemy. 0 (the default) means no knockback at all -- see
     // applyKnockback, which skips all work in that case.
     this.knockback = config.knockback !== undefined ? config.knockback
       : (typeDefaults.knockback !== undefined ? typeDefaults.knockback : 0);
+
+    // HitsBreakable
+    this.hitsBreakable = config.hitsBreakable !== undefined ? config.hitsBreakable : typeDefaults.hitsBreakable;
 
     // Attack range box -- shoot() only fires while the player is within this many
     // pixels of the enemy's *current* position on each side (recomputed every shot,
@@ -177,22 +172,27 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     // Beam types fire a single instant hitscan shot (resolved entirely in
     // GameScene.fireEnemyBeam) rather than looping projectileCount travelling
     // bullets -- projectileCount is simply unused in this branch.
+    // this.scene.rng rather than Math.random() -- a seeded PRNG the scene owns, so
+    // hint-replay playback (which seeds it the same way every time and drives enemies
+    // through the same sequence of update() calls) reproduces the same spread on
+    // every viewing instead of a fresh random one each time.
     if (this.isBeam) {
-      const offset = (Math.random() - Math.random()) * spread;
+      const offset = (this.scene.rng.next() - this.scene.rng.next()) * spread;
       this.scene.fireEnemyBeam(this, baseAngle + offset);
       return;
     }
 
     for (let i = 0; i < this.projectileCount; i++) {
-      const offset = (Math.random() - Math.random()) * spread; // triangular distribution, weighted toward 0
+      const offset = (this.scene.rng.next() - this.scene.rng.next()) * spread; // triangular distribution, weighted toward 0
       this.fireBullet(baseAngle + offset);
     }
   }
 
   fireBullet(angle) {
     const bullet = createBullet(this.scene, this.scene.enemyBullets, 'bulletEnemy', this.x, this.y, angle, this.projectileSpeed);
+    bullet.hitsBreakable = this.hitsBreakable;
     // Stamps the bullet with the exact fields GameScene.explodeBullet() reads
-    // (explodesOnHit/explosionRadius/damage -- the same convention the player's own
+    // (explodesOnHit/explosionRadius -- the same convention the player's own
     // explosive weapons use) so it detonates on impact. These travel with the
     // bullet itself rather than being looked up from the enemy, since the enemy
     // that fired it may no longer exist (or be out of range/reused) by the time the
@@ -200,7 +200,6 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (this.explodesOnHit) {
       bullet.explodesOnHit = true;
       bullet.explosionRadius = this.explosionRadius;
-      bullet.damage = this.explosionDamage;
     }
   }
 

@@ -1,7 +1,7 @@
 import { initAudioManager } from "../save/AudioManager.js";
 import { createBackground } from "../ui/PlatformBackground.js";
 import { getCurrentBackground } from "../ui/BackgroundManager.js";
-import { fadeIn, fadeToScene } from "../ui/SceneTransitions.js";
+import { fadeIn, fadeToScene } from "../fx/SceneTransitions.js";
 
 export class MenuScene extends Phaser.Scene {
 

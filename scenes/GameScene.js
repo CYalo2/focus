@@ -8,11 +8,19 @@ import { createPlatforms } from "../entity/Platform.js";
 import { destroyOffscreenBullets, reorientBullet, redirectBullet } from "../entity/Bullet.js";
 import { Hud } from "../ui/Hud.js";
 import { showEndScreen } from "../ui/EndScreen.js";
+import { SeededRandom } from "../data/SeededRandom.js";
 import { showPauseMenu } from "../ui/PauseMenu.js";
 import { spawnBulletBreakParticles, spawnBulletBounceParticles, spawnEnemyDeathParticles, startGoalActivationParticles, spawnPlatformHitParticles, spawnPlatformBreakParticles } from "../fx/Particles.js";
-import { recordLevelCompletion } from "../save/SaveManager.js";
+import { recordLevelCompletion, notifyGameplayStart, notifyGameplayStop, getAutoAim, getChallengeMode } from "../save/SaveManager.js";
+import { HINT_RECORDING_ENABLED, HintRecorder, HintPlayback, fromB36 } from "../data/HintReplay.js";
+import { setBulletTimeAudioEffect } from "../save/AudioManager.js";
 
 const CHEAT = false;
+// Arbitrary distance used to reconstruct a fake pointer.worldX/worldY from the
+// player's position + a recorded aim angle during hint playback (see
+// updateHintPlayback()) -- any nonzero value works since only the direction is ever
+// read, not the distance.
+const AIM_RAY_LENGTH = 1000;
 
 // Duration (ms) of the brief flash that confirms an in-game R press registered, and
 // how long retryLevelWithFlash() waits before actually restarting the scene -- kept
@@ -83,13 +91,49 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.levelIndex = data.levelIndex || 0;
     this.levelData = LEVELS[this.levelIndex];
+    // Hint playback: reruns this same level driven by a prerecorded input script
+    // instead of live input (see updateHintPlayback()), rather than spinning up a
+    // separate scene -- it needs the exact same level-build logic below (platforms,
+    // enemies, goal, etc.), so reusing this scene via a restart flag avoids
+    // duplicating any of that.
+    this.isHintPlayback = data.hintPlayback === true;
+    // Belt-and-suspenders alongside the flip in create(): guarantees update() bails
+    // out for the entire init -> preload -> create window on a restart too, rather
+    // than briefly running with the previous instance's now-stale sceneReady=true.
+    this.sceneReady = false;
   }
 
-  create() {
+  async create() {
+    // create() is async (see the `await getAutoAim()` below), but Phaser never awaits
+    // create() itself -- it starts calling update() every frame as soon as create()
+    // is invoked, regardless of whether it's actually finished. Without this flag,
+    // update() (and anything it touches, e.g. this.keys via applyBulletTimeToggle())
+    // can run mid-await, before the rest of create() below has had a chance to set
+    // up this.keys, this.cursors, physics groups, the HUD, etc. Set false here and
+    // flipped true at the very end of create(), with a matching early-return guard at
+    // the top of update().
+    this.sceneReady = false;
+
     const level = this.levelData;
 
     // --- weapon ---
     this.weapon = WEAPONS[level.weapon];
+
+    // --- autoaim ---
+    // Preloads the stored autoaim preference into memory (a no-op if some other
+    // scene already loaded it this session -- see getAutoAim()'s own caching) so
+    // Player.getAimAngle() can read it synchronously every frame via
+    // isAutoAimEnabled(), rather than awaiting a storage read on every shot. Toggling
+    // it later, from PauseMenu's settings modal, updates that same cache instantly
+    // (see SaveManager.setAutoAim()), so a mid-level change takes effect immediately
+    // without needing this level to reload.
+    await getAutoAim();
+
+    // --- challenge mode ---
+    // Same preload-then-cache pattern as getAutoAim() above: defaults to true (see
+    // SaveManager.getChallengeMode()), and just needs to be resolved once before the
+    // time-limit field below is picked.
+    this.challengeModeEnabled = await getChallengeMode();
 
     // --- state ---
     this.bulletTimeActive = false;
@@ -98,7 +142,21 @@ export class GameScene extends Phaser.Scene {
     this.bulletCleanupFrame = 0; // throttles destroyOffscreenBullets to every 4th frame
 
     // --- time limit (optional per-level; omit for no limit and no HUD display) ---
-    this.timeLimitMs = level.timeLimitMs !== undefined ? level.timeLimitMs : null;
+    // With challenge mode on, a level's challengeTimeMs takes over from its regular
+    // timeLimitMs -- falling back to timeLimitMs if the level doesn't define a
+    // challenge-specific one, so levels without a challengeTimeMs behave exactly as
+    // they did before challenge mode existed.
+    //
+    // Hint playback is exempt from this: it's a preview of the recorded hint run
+    // (see HintPlayback in HintReplay.js), not a real attempt, and the hint itself
+    // was recorded against the level's normal timeLimitMs -- so it always plays back
+    // on that same normal timer regardless of whatever the *viewer's* own challenge
+    // mode setting happens to be right now.
+    this.usingChallengeTimer = this.challengeModeEnabled
+      && !this.isHintPlayback
+      && level.challengeTimeMs !== undefined;
+    const activeTimeLimitMs = this.usingChallengeTimer ? level.challengeTimeMs : level.timeLimitMs;
+    this.timeLimitMs = activeTimeLimitMs !== undefined ? activeTimeLimitMs : null;
     this.timeRemainingMs = this.timeLimitMs;
 
     // Always-on stopwatch, unlike timeRemainingMs above -- runs for every level
@@ -109,6 +167,29 @@ export class GameScene extends Phaser.Scene {
     this.elapsedMs = 0;
 
     this.goalActivated = false; // guards startGoalActivationParticles firing more than once
+
+    // --- hint recording (dev tool) ---
+    if (HINT_RECORDING_ENABLED) {
+      this.hintRecorder = new HintRecorder();
+    }
+
+    // --- seeded RNG, used by Enemy.shoot() for accuracy spread instead of
+    // Math.random(). During hint playback this is seeded from the recorded run's
+    // stored seed (base36-encoded in the level file to keep it short -- see
+    // HintRecorder.copyToClipboard() -- hence the fromB36() here), so the same input
+    // script always produces the same enemy shots as it did when recorded. Outside
+    // of hint playback the seed doesn't matter -- Date.now() is just as good as
+    // Math.random() there. ---
+    this.rng = new SeededRandom(this.isHintPlayback ? fromB36(level.hintReplay.seed) : Date.now());
+
+    // --- hint playback: paces itself off the recording's own scaledDt (not real dt)
+    // so a bullet-time stretch in the original run doesn't replay in slow motion --
+    // see the fuller reasoning in HintPlayback's doc comment in HintReplay.js.
+    // level.hintReplay.frames is the packed "dt,bitmask[,angle]|..." string --
+    // HintPlayback decodes it itself, so it's passed straight through here. ---
+    if (this.isHintPlayback) {
+      this.hintPlayback = new HintPlayback(level.hintReplay.frames);
+    }
 
     // Persistent circle shown while a CHARGE-mode weapon is held at full charge --
     // created lazily the first time it's needed and destroyed when it isn't; reset
@@ -269,7 +350,9 @@ export class GameScene extends Phaser.Scene {
       b.destroy();
     });
 
-    this.physics.add.overlap(this.enemyBullets, this.platformsBreakable, (bullet, platform) => this.damagePlatform(bullet, platform, 1, BULLET_ENEMY_TINT));
+    this.physics.add.overlap(this.enemyBullets, this.platformsBreakable, (bullet, platform) => {
+      this.damagePlatform(bullet, platform, bullet.hitsBreakable ? 1 : 0, BULLET_ENEMY_TINT);
+    });
     this.physics.add.collider(this.enemyBullets, this.platformsNormal, (b) => {
       this.explodeBullet(b, null, BULLET_ENEMY_TINT);
       spawnBulletBreakParticles(this, b.x, b.y, BULLET_ENEMY_TINT);
@@ -323,7 +406,16 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse.disableContextMenu();
 
     // --- HUD (fixed to camera) ---
-    this.hud = new Hud(this, { hasTimer: this.timeLimitMs !== null, hasEnemies: level.enemies.length > 0 });
+    this.hud = new Hud(this, {
+      hasTimer: this.timeLimitMs !== null,
+      challengeMode: this.usingChallengeTimer,
+      hasEnemies: level.enemies.length > 0,
+      // Hint playback is a preview, not a real attempt -- there's nothing to pause
+      // or retry mid-preview (see the isHintPlayback guards on keydown-E/R below), so
+      // the buttons that front those actions are hidden rather than shown non-
+      // functional.
+      showControlButtons: !this.isHintPlayback,
+    });
 
     // --- pause menu ---
     this.isPaused = false;
@@ -345,6 +437,7 @@ export class GameScene extends Phaser.Scene {
     // so without this guard, holding E would toggle pause on and off over and over
     // instead of just once.
     this.input.keyboard.on("keydown-E", (event) => {
+      if (this.isHintPlayback) return; // no pausing over a hint preview -- see the Hud showControlButtons wiring above
       if (event.repeat) return;
       this.togglePause();
     });
@@ -356,6 +449,7 @@ export class GameScene extends Phaser.Scene {
     // retries instantly, no flash) -- so R mirrors that instead of adding a flash on
     // top of a screen that's already telling you the game is paused.
     this.input.keyboard.on("keydown-R", () => {
+      if (this.isHintPlayback) return; // no retrying over a hint preview -- see the Hud showControlButtons wiring above
       if (this.isPaused) {
         this.retryLevel();
       } else {
@@ -370,6 +464,42 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard.on("keydown-SPACE", () => {
       if (this.isPaused) this.resumeGame();
     });
+    // Dev tool: copies the current run's recorded input frames to the clipboard as
+    // JSON, ready to paste into a level's hintReplay field. No-op unless
+    // HINT_RECORDING_ENABLED is on -- doesn't fire during real play by accident.
+    this.input.keyboard.on("keydown-P", () => {
+      if (!HINT_RECORDING_ENABLED) return;
+      this.hintRecorder.copyToClipboard()
+        .then(({ recordedCount, simplifiedCount }) =>
+          console.log(`Hint replay copied (${recordedCount} frames recorded, ${simplifiedCount} after simplification).`))
+        .catch((err) => console.error("Failed to copy hint replay:", err));
+    });
+    // Dev tool: press O to immediately preview this level's recorded hint replay --
+    // same scene.restart({ hintPlayback: true }) the real HINT button uses (see
+    // requestHintReplay() in EndScreen.js), just without the loss requirement or the
+    // rewarded-ad gate real players go through, so a hint can be sanity-checked right
+    // after pasting it into Levels.js without needing to actually lose the level
+    // first. No-op unless HINT_RECORDING_ENABLED is on, this level actually has a
+    // hintReplay recorded yet, and this session isn't itself already a hint playback
+    // (which would otherwise let O recursively restart into itself).
+    this.input.keyboard.on("keydown-O", () => {
+      if (!HINT_RECORDING_ENABLED || this.isHintPlayback) return;
+      if (!this.levelData.hintReplay) {
+        console.warn("No hintReplay recorded for this level -- press P to copy one to the clipboard, then paste it into Levels.js first.");
+        return;
+      }
+      this.scene.restart({ levelIndex: this.levelIndex, hintPlayback: true });
+    });
+
+    // Tell CrazyGames active gameplay has begun -- covers both a fresh level start
+    // and a retry (scene.restart() tears down and rebuilds the scene, running create()
+    // again). Skipped during hint playback, which isn't real played time -- see the
+    // comment on notifyGameplayStart() in SaveManager.js.
+    if (!this.isHintPlayback) notifyGameplayStart();
+
+    // Everything above is done -- this.keys, this.cursors, physics groups, the HUD,
+    // etc. are all in place -- so it's now safe for update() to run.
+    this.sceneReady = true;
   }
 
   togglePause() {
@@ -402,6 +532,7 @@ export class GameScene extends Phaser.Scene {
     // post-pause frame and would otherwise read as an immediate fire input.
     this.player.fireInputArmed = false;
     this.music?.pause();
+    notifyGameplayStop();
     showPauseMenu(this).catch((err) => console.error("Failed to show pause menu:", err));
   }
 
@@ -417,6 +548,7 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = false;
     this.anims.resumeAll();
     this.music?.resume();
+    if (!this.isHintPlayback) notifyGameplayStart();
   }
 
   // Quick retry, callable from anywhere (R key while paused, the HUD's retry button,
@@ -507,6 +639,18 @@ export class GameScene extends Phaser.Scene {
     if (CHEAT) return;
 
     if (this.gameEnded) return;
+    // isHintPlayback: loseLevel() below already no-ops during a hint preview (it's a
+    // ghost run, not a real attempt -- see loseLevel()'s own guard), so this never
+    // actually ends the level. The explode/particles/destroy/flash feedback used to
+    // also get skipped here whenever HINT_RECORDING_ENABLED was false, on the theory
+    // that a real player watching a hint preview shouldn't see it -- but that made a
+    // hint replay's hits completely invisible (no flash, bullet doesn't even
+    // disappear), which meant a replay-consistency bug like the corner-warp one
+    // earlier could land a hit and nobody watching would ever notice. So this now
+    // always shows the same feedback a live hit would, regardless of
+    // HINT_RECORDING_ENABLED -- loseLevel() below is still the only thing gated on
+    // isHintPlayback (via its own guard), so nothing about level-ending behavior
+    // changes.
     // excludeObj = this.player: the direct hit below already handles the player's
     // death, so explodeBullet's own player-splash check (see explodeBullet) skips
     // re-triggering it -- this call is just for the splash against any enemies/
@@ -528,33 +672,36 @@ export class GameScene extends Phaser.Scene {
     if (!bullet.explodesOnHit) return;
 
     const { x, y, explosionRadius: radius, damage } = bullet;
-    this.spawnExplosionEffect(x, y, radius, this.enemyBullets.contains(bullet) ? BULLET_ENEMY_TINT : undefined);
+    const enemy = this.enemyBullets.contains(bullet);
+    this.spawnExplosionEffect(x, y, radius, enemy ? BULLET_ENEMY_TINT : undefined);
 
     // includeStatic must be true here -- breakable platforms live in a static physics
     // group, and overlapCirc excludes static bodies by default, which is why the splash
     // previously only ever found (dynamic) enemies.
-    const bodies = this.physics.overlapCirc(x, y, radius, true, true);
-    bodies.forEach((body) => {
-      const obj = body.gameObject;
-      if (!obj || obj === excludeObj || !obj.active) return;
+    if (!enemy || bullet.hitsBreakable) {
+      const bodies = this.physics.overlapCirc(x, y, radius, true, true);
+      bodies.forEach((body) => {
+        const obj = body.gameObject;
+        if (!obj || obj === excludeObj || !obj.active) return;
 
-      if (this.enemies.contains(obj)) {
-        // Splash-caught enemies get knocked back too, same as a direct hit -- but
-        // radiating outward from the explosion's center rather than along the
-        // bullet's travel direction, since each enemy in the blast sits at its own
-        // angle from that center. The directly-hit enemy (excludeObj) isn't touched
-        // here; it already got its own knockback from the bullet's travel angle in
-        // hitEnemy()/hitEnemyWithBeam() before this ever runs.
-        const knockbackAngle = Phaser.Math.Angle.Between(x, y, obj.x, obj.y);
-        obj.applyKnockback(knockbackAngle, bullet.knockbackScale !== undefined ? bullet.knockbackScale : 1);
-        if (obj.hit(damage)) {
-          spawnEnemyDeathParticles(this, obj.x, obj.y);
-          obj.destroy();
+        if (this.enemies.contains(obj) && !enemy) {
+          // Splash-caught enemies get knocked back too, same as a direct hit -- but
+          // radiating outward from the explosion's center rather than along the
+          // bullet's travel direction, since each enemy in the blast sits at its own
+          // angle from that center. The directly-hit enemy (excludeObj) isn't touched
+          // here; it already got its own knockback from the bullet's travel angle in
+          // hitEnemy()/hitEnemyWithBeam() before this ever runs.
+          const knockbackAngle = Phaser.Math.Angle.Between(x, y, obj.x, obj.y);
+          obj.applyKnockback(knockbackAngle, bullet.knockbackScale !== undefined ? bullet.knockbackScale : 1);
+          if (obj.hit(damage)) {
+            spawnEnemyDeathParticles(this, obj.x, obj.y);
+            obj.destroy();
+          }
+        } else if (this.platformsBreakable.contains(obj)) {
+          this.damagePlatformAtPoint(obj.x, obj.y, obj, damage, tint);
         }
-      } else if (this.platformsBreakable.contains(obj)) {
-        this.damagePlatformAtPoint(obj.x, obj.y, obj, damage, tint);
-      }
-    });
+      });
+    }
 
     // Enemy-fired explosions (blaster-type projectiles -- see EnemyTypes.js) also
     // catch the player in their blast, even on a near-miss that only directly hit a
@@ -566,6 +713,11 @@ export class GameScene extends Phaser.Scene {
       && this.player.active && !this.gameEnded && !CHEAT) {
       const dist = Phaser.Math.Distance.Between(x, y, this.player.x, this.player.y);
       if (dist <= radius) {
+        // See hitPlayer()'s comment above -- the HINT_RECORDING_ENABLED-gated flash
+        // suppression that used to sit here was removed for the same reason: a
+        // splash hit during hint playback needs to be just as visible as a direct
+        // one, or a replay-consistency bug landing one is invisible to whoever's
+        // watching.
         this.cameras.main.flash(80, 200, 40, 40);
         this.loseLevel();
       }
@@ -584,12 +736,19 @@ export class GameScene extends Phaser.Scene {
   // the beam.
   // chargeRatio (0, 1]: how charged the shot was at release -- see
   // Player.getChargeRatio(). Defaults to 1 (fully charged) same as fireWeapon().
-  fireBeamWeapon(player, pointer, chargeRatio = 1) {
+  // aimAngle (radians): computed by the caller (Player.fireWeapon(), via
+  // getAimAngle()) rather than re-derived here from a pointer -- this is what makes
+  // a beam weapon subject to the same autoaim/manual-override logic as any other
+  // weapon, instead of always firing straight at the mouse. Angle origin is the
+  // player's own position (this.x, this.y), same as getAimAngle() and every other
+  // weapon's aim -- a small, pre-existing difference from originX/originY (the
+  // weapon sprite tip, used below only as the beam's actual visual/raycast origin)
+  // that's negligible given how close the two points are.
+  fireBeamWeapon(player, aimAngle, chargeRatio = 1) {
     const weapon = player.weapon;
     const damage = weapon.damage * chargeRatio;
     const originX = player.weaponSprite.x;
     const originY = player.weaponSprite.y;
-    const aimAngle = Phaser.Math.Angle.Between(originX, originY, pointer.worldX, pointer.worldY);
     const angle = applyWeaponSpread(weapon, aimAngle);
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
@@ -680,7 +839,6 @@ export class GameScene extends Phaser.Scene {
   // it as solid instead keeps beam behavior a reasonable match for how a regular
   // bullet would have been stopped at that same platform.
   fireEnemyBeam(enemy, angle) {
-    const damage = enemy.beamDamage;
     const originX = enemy.x;
     const originY = enemy.y;
     const dx = Math.cos(angle);
@@ -708,8 +866,8 @@ export class GameScene extends Phaser.Scene {
     this.platformsBreakable.getChildren().slice().forEach((platform) => {
       if (!platform || !platform.active) return;
       const t = this.raycastRect(originX, originY, dx, dy, platform.body);
-      if (t !== null && t <= beamLength) {
-        this.damagePlatformAtPoint(originX + dx * t, originY + dy * t, platform, damage, BULLET_ENEMY_TINT);
+      if (enemy.hitsBreakable && t !== null && t <= beamLength) {
+        this.damagePlatformAtPoint(originX + dx * t, originY + dy * t, platform, 1, BULLET_ENEMY_TINT);
       }
     });
 
@@ -730,6 +888,8 @@ export class GameScene extends Phaser.Scene {
   hitPlayerWithBeam() {
     if (CHEAT) return;
     if (this.gameEnded) return;
+    // See hitPlayer()'s comment above -- same reasoning, flash is no longer
+    // suppressed during hint playback just because HINT_RECORDING_ENABLED is false.
     this.cameras.main.flash(80, 200, 40, 40);
     this.loseLevel();
   }
@@ -793,7 +953,7 @@ export class GameScene extends Phaser.Scene {
     this.explodeBullet(bullet, platform, tint);
     const x = bullet.x, y = bullet.y;
     bullet.destroy();
-    this.damagePlatformAtPoint(x, y, platform, damage, tint);
+    if (damage != 0) this.damagePlatformAtPoint(x, y, platform, damage, tint);
   }
 
   // Called right after a player bullet is created (see Player.fireWeapon), in case its
@@ -882,10 +1042,18 @@ export class GameScene extends Phaser.Scene {
   // immediately; only the end-screen overlay itself is delayed by the save round-trip
   // (typically near-instant on localStorage, capped at SDK_TIMEOUT_MS on CrazyGames).
   async winLevel() {
+    // Hint playback is a preview, not a real attempt -- it ends on its own once the
+    // recorded frames run out (see updateHintPlayback()/endHintPlayback()), not
+    // because the ghost happened to touch the goal. Without this guard, a hint replay
+    // reaching the goal would trigger a real win: saving a completion time and
+    // showing the normal win screen with a NEXT LEVEL button, which isn't what a
+    // preview should do.
+    if (this.isHintPlayback) return;
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.physics.pause();
     this.music?.stop();
+    notifyGameplayStop();
     // Same reset as loseLevel() -- if bullet time is still active (SHIFT held) at the
     // moment of winning, this.time/tweens/physics.world timeScale would otherwise stay
     // slowed. Scene.start('GameScene', ...) for the next level reuses this same scene
@@ -896,6 +1064,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = 1;
     this.time.timeScale = 1;
     this.tweens.timeScale = 1;
+    setBulletTimeAudioEffect(false);
     const elapsedMs = this.elapsedMs;
     let isNewBest = false;
     try {
@@ -907,11 +1076,17 @@ export class GameScene extends Phaser.Scene {
   }
 
   loseLevel(message = 'YOU DIED') {
+    // Same reasoning as the guard at the top of winLevel() -- a hint preview dying to
+    // an enemy bullet or a death platform along the way shouldn't cut the preview
+    // short with a real death screen. It plays out to the end of the recorded frames
+    // regardless (endHintPlayback() handles how it actually ends).
+    if (this.isHintPlayback) return;
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.physics.pause();
     this.music?.stop();
     this.player.setTint(0x555555);
+    notifyGameplayStop();
     // If the player dies mid-bullet-time (SHIFT still held), update()'s toggle-off logic
     // below never runs again since it bails out on gameEnded -- reset these here instead,
     // so a retry doesn't inherit bullet time's slowdown. this.time in particular persists
@@ -921,11 +1096,253 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.timeScale = 1;
     this.time.timeScale = 1;
     this.tweens.timeScale = 1;
+    setBulletTimeAudioEffect(false);
     showEndScreen(this, message, '#e24b4a', false);
   }
 
+  // Reached once the recorded hint frames run out (called from updateHintPlayback()).
+  // Mirrors winLevel()/loseLevel()'s pause-and-show-screen shape, but there's no
+  // completion time to save and no NEXT LEVEL button to offer -- it's a preview, not
+  // an attempt. showEndScreen's own hint-button logic checks this.isHintPlayback
+  // (still true at this point, never reset) to suppress showing a second HINT button
+  // on this screen.
+  endHintPlayback() {
+    if (this.gameEnded) return;
+    this.gameEnded = true;
+    this.physics.pause();
+    this.music?.stop();
+    // Same reset as winLevel()/loseLevel() -- the viewer may still be holding SHIFT
+    // (see applyBulletTimeToggle() in updateHintPlayback()) at the exact moment the
+    // recorded frames run out, which would otherwise leave this.time/tweens/
+    // physics.world timeScale slowed for whatever comes next (this.time persists
+    // across a scene restart, so it'd carry the slowdown into a real retry too).
+    this.bulletTimeActive = false;
+    this.physics.world.timeScale = 1;
+    this.time.timeScale = 1;
+    this.tweens.timeScale = 1;
+    setBulletTimeAudioEffect(false);
+    showEndScreen(this, 'HINT', '#3aa0ff', false);
+  }
+
+  // Drives the player/enemies through a prerecorded input script instead of live
+  // input, in place of the normal per-frame logic below -- called from update()
+  // instead of the real update body whenever this.isHintPlayback is set. Frame
+  // timing/lookup is delegated to this.hintPlayback (see HintPlayback in
+  // HintReplay.js); this method's job is just to drive real Player.update()/
+  // Enemy.update() calls with whatever input state that returns, exactly like the
+  // real update() loop does with live input.
+  //
+  // Reads the live SHIFT key via applyBulletTimeToggle() -- the same toggle real
+  // gameplay uses -- so a viewer can hold SHIFT during a hint to slow the whole
+  // preview down for a closer look, independent of whatever bullet time the
+  // recording itself used.
+  updateHintPlayback(time, delta) {
+    this.applyBulletTimeToggle();
+    const scaledDelta = delta * this.time.timeScale;
+
+    // --- time limit countdown -- same raw-delta pacing as the real update() loop,
+    // so the HUD timer actually counts down during a hint instead of sitting frozen
+    // at its starting value for the whole preview. ---
+    if (this.timeLimitMs !== null) {
+      this.timeRemainingMs = Math.max(0, this.timeRemainingMs - delta);
+    }
+
+    // --- parallax background -- see the identical lines in the normal (non-hint)
+    // update() path for the full explanation. This early-returns before ever
+    // reaching that code, so without this the background just sits frozen at
+    // whatever tilePosition it last had for the entire hint preview. ---
+    this.background.tilePositionX = this.cameras.main.scrollX * this.backgroundScrollFactor;
+    this.background.tilePositionY = this.cameras.main.scrollY * this.backgroundScrollFactor;
+
+    // --- walk the recording forward by this tick's real elapsed time, clipping to
+    // each recorded frame's own boundary rather than feeding it straight through as
+    // one lump -- see HintPlayback.advance()'s doc comment in HintReplay.js for the
+    // full reasoning. Ordinarily this loop runs once (this tick's delta fits
+    // entirely within the current frame's remaining time), but it can run several
+    // times if a real tick happens to straddle one or more short recorded frames, or
+    // zero times (falls through immediately) if the current frame's remaining time
+    // has already been exhausted and there's nothing left to spend until the
+    // recording ends.
+    //
+    // player.update() is called once per slice here, in the recording's own
+    // temporal order -- NOT once per real tick off whichever frame occupied the
+    // largest share of it (an earlier version of this method tried that, on the
+    // theory that Arcade Physics only ever integrates the LAST velocity set before
+    // its own automatic per-real-frame step anyway, so using the longest-duration
+    // frame's input would be more representative of the tick as a whole). That
+    // broke edge-triggered, one-shot actions like jumping: Player.js's jump only
+    // fires on the exact instant `up` is held AND body.blocked.down is true
+    // (`if (jump && this.body.blocked.down) this.setVelocityY(...)`), evaluated
+    // fresh on every call. With only one call per tick, a short jump frame
+    // followed by a longer non-jumping frame in the same tick meant the jump
+    // frame's input was simply never seen -- the jump silently never fired.
+    // Calling update() per slice, in order, avoids that for free: the frame that
+    // actually triggers the jump is the one that runs `setVelocityY`, and later
+    // calls that tick don't touch velocityY unless their own conditions call for
+    // it, so the jump survives into whatever Arcade eventually integrates. The
+    // remaining imprecision -- Arcade's own automatic stepping only ever actually
+    // integrates position using whichever slice's setVelocityX/Y calls happened
+    // LAST before its once-per-real-frame step runs, not each slice's individually
+    // -- is a smaller, harder-to-notice cost than dropping inputs outright, and
+    // matches this method's original design. ---
+    let remaining = scaledDelta;
+    while (!this.hintPlayback.done) {
+      // Force the newly-active frame's genuine fire/dash event (if any) the INSTANT
+      // it becomes active -- even before spending any of its duration below -- at
+      // its exact recorded angle, BEFORE player.update() runs its own
+      // cooldown/charge/dash logic off the merely-interpolated pointer. See
+      // HintPlayback.takePendingFireEvent()'s doc comment for why trusting that
+      // per-tick logic to independently land on the same frame (and angle) the
+      // original recording did isn't reliable -- without this, a fast/held-fire
+      // weapon can end up firing a step or two into the turn toward its next
+      // target angle instead of right at it. Returns null every call except the
+      // first one after this frame became current, so this is safe to call every
+      // loop iteration (and every tick, while stuck on the same frame) without
+      // double-forcing anything.
+      const evt = this.hintPlayback.takePendingFireEvent();
+      if (evt) {
+        if (evt.fire) this.player.forceFireEvent(evt.angle, this.playerBullets);
+        if (evt.dash) this.player.forceDashEvent(evt.angle);
+      }
+
+      const frameRemaining = this.hintPlayback.remainingInCurrentFrame();
+      if (frameRemaining <= 0) {
+        // A recorded frame with dt rounded down to 0ms -- nothing to spend, just
+        // move straight to the next one without touching this tick's budget.
+        this.hintPlayback.advance(0);
+        continue;
+      }
+      if (remaining <= 0) break; // no real time left to spend this tick
+
+      const stepDt = Math.min(remaining, frameRemaining);
+      const f = this.hintPlayback.currentInputState();
+      this.downHeld = f.down;
+
+      // Reconstructs a fake pointer.worldX/worldY from the *live* player position
+      // (not whatever position the player happened to be at when this was
+      // recorded, which may not even exactly match during playback) plus the
+      // recorded aim angle, at an arbitrary distance -- Player.js only ever
+      // derives a direction from the pointer via Angle.Between(player, pointer),
+      // never uses its actual distance, so any nonzero AIM_RAY_LENGTH reproduces
+      // the same angle. See HintReplay.js's top comment for why storing an angle
+      // instead of a point is safe to do at all.
+      const aimWorldX = this.player.x + Math.cos(f.angle) * AIM_RAY_LENGTH;
+      const aimWorldY = this.player.y + Math.sin(f.angle) * AIM_RAY_LENGTH;
+
+      // stepDt -- clipped to this frame's remaining duration, not the tick's raw
+      // scaledDelta -- so cooldown/charge/dash-lock timers etc count down by
+      // precisely as much time as this recorded frame actually covered.
+      this.player.update(time, stepDt, stepDt, {
+        cursors: { left: { isDown: f.left }, right: { isDown: f.right }, up: { isDown: f.up } },
+        keys: { A: { isDown: f.left }, D: { isDown: f.right }, W: { isDown: f.up }, SPACE: { isDown: f.fire }, Q: { isDown: f.dash } },
+        pointer: {
+          worldX: aimWorldX,
+          worldY: aimWorldY,
+          // Approximation for the fire-ready flash position (Player.js's only use
+          // of screen-space x/y) -- unscrolling the synthetic world point by the
+          // current camera scroll. It's a one-frame cosmetic flash, so exactness
+          // doesn't matter.
+          x: aimWorldX - this.cameras.main.scrollX,
+          y: aimWorldY - this.cameras.main.scrollY,
+          leftButtonDown: () => f.fire,
+          rightButtonDown: () => f.dash,
+        },
+        bulletGroup: this.playerBullets,
+        // Actual shots/dashes during hint playback are driven exclusively by the
+        // forceFireEvent()/forceDashEvent() calls above, off the recording's own
+        // timeline -- see Player.update()'s suppressAutoFire doc comment for why
+        // this update() call itself must not also be allowed to trigger one on
+        // its own.
+        suppressAutoFire: true,
+      });
+
+      this.hintPlayback.advance(stepDt);
+      remaining -= stepDt;
+    }
+
+    if (this.hintPlayback.done) {
+      this.endHintPlayback();
+      return;
+    }
+
+    this.enemies.children.iterate((enemy) => {
+      if (enemy && enemy.active) enemy.update(time, delta, scaledDelta);
+    });
+
+    this.bulletCleanupFrame++;
+    if (this.bulletCleanupFrame % 4 === 0) {
+      destroyOffscreenBullets(this.playerBullets, this.worldBounds, BULLET_OFFSCREEN_MARGIN);
+      destroyOffscreenBullets(this.enemyBullets, this.worldBounds, BULLET_OFFSCREEN_MARGIN);
+    }
+
+    // Surfaces the bullet-time vignette for the whole preview -- a constant visual
+    // cue that this is a hint replay, not real gameplay -- independent of whatever
+    // this.bulletTimeActive actually is right now (that still reflects the live
+    // SHIFT key, still genuinely slowing the preview down via applyBulletTimeToggle()
+    // above; this is just the HUD tint, forced on regardless). enemiesLeft/
+    // timeRemainingMs are along for the ride since Hud.update() expects all three,
+    // not because either is meaningful mid-preview.
+    this.hud.update({
+      enemiesLeft: this.enemies.countActive(true),
+      bulletTimeActive: true,
+      timeRemainingMs: this.timeRemainingMs,
+    });
+  }
+
+  // Reads the live SHIFT key and applies/reverts the bullet-time slowdown across
+  // physics/time/tweens/anims, only touching anything on an actual state change.
+  // Shared by the real update() loop and updateHintPlayback() -- the latter calls
+  // this too, so a viewer can hold SHIFT during a hint to slow the preview down for
+  // a closer look, exactly like real gameplay, even though the input driving the
+  // player/enemies themselves is prerecorded rather than live.
+  applyBulletTimeToggle() {
+    const wantsBulletTime = this.keys.SHIFT.isDown;
+    if (wantsBulletTime === this.bulletTimeActive) return;
+    this.bulletTimeActive = wantsBulletTime;
+    // BULLET_TIME_MULTIPLIER is the speed multiplier applied while bullet time is
+    // active (e.g. 0.5 = half speed). time.timeScale and tweens.timeScale both use
+    // the intuitive "higher = faster" convention, so scale applies directly to them.
+    // Arcade's physics.world.timeScale is inverted: with the default fixedStep mode,
+    // a LOWER value makes physics steps trigger more often (i.e. faster movement), so
+    // it needs the reciprocal to actually slow gravity/velocity/bullets down in sync
+    // with everything else.
+    const scale = this.bulletTimeActive ? BULLET_TIME_MULTIPLIER : 1;
+    this.physics.world.timeScale = 1 / scale;
+    this.time.timeScale = scale;
+    this.tweens.timeScale = scale;
+    this.anims.globalTimeScale = scale;
+    setBulletTimeAudioEffect(this.bulletTimeActive);
+  }
+
   update(time, delta) {
+    // create() is async and hasn't necessarily finished setting up this.keys,
+    // this.cursors, physics groups, etc. yet -- see the comment on the sceneReady
+    // flag near the top of create(). Bail out entirely until it has.
+    if (!this.sceneReady) return;
+
+    // --- hint recording: catch the "closing" frame. Arcade's physics step resolves
+    // overlaps (e.g. the bullet that kills the last enemy, or a death-platform touch)
+    // *before* this update() call runs each frame -- so on the exact frame gameEnded
+    // first flips true, winLevel()/loseLevel() have already fired above, and the
+    // early return below would skip this frame's hint recording entirely. That would
+    // leave the recording's total duration exactly one frame short of the real run:
+    // during playback, the ghost would then pause one frame *before* that same
+    // overlap has time to resolve again, freezing on a not-quite-dead enemy (or a
+    // not-quite-dead player). recordClosingFrameOnce() (see HintReplay.js) records
+    // this frame's dt with no held inputs -- nothing meaningful drives the player
+    // after the game is over -- giving playback that missing bit of time back, and
+    // is safe to call every frame gameEnded stays true since only the first call
+    // actually records.
+    if (HINT_RECORDING_ENABLED && !this.isHintPlayback && this.gameEnded) {
+      this.hintRecorder.recordClosingFrameOnce(delta * this.time.timeScale);
+    }
+
     if (this.gameEnded || this.isPaused) return;
+
+    if (this.isHintPlayback) {
+      this.updateHintPlayback(time, delta);
+      return;
+    }
 
     // --- elapsed-time stopwatch for save purposes -- always runs, regardless of
     // whether this level has a timeLimitMs, and uses the same raw/unscaled delta so
@@ -942,22 +1359,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     // --- bullet time toggle ---
-    const wantsBulletTime = this.keys.SHIFT.isDown;
-    if (wantsBulletTime !== this.bulletTimeActive) {
-      this.bulletTimeActive = wantsBulletTime;
-      // BULLET_TIME_MULTIPLIER is the speed multiplier applied while bullet time is
-      // active (e.g. 0.5 = half speed). time.timeScale and tweens.timeScale both use
-      // the intuitive "higher = faster" convention, so scale applies directly to them.
-      // Arcade's physics.world.timeScale is inverted: with the default fixedStep mode,
-      // a LOWER value makes physics steps trigger more often (i.e. faster movement), so
-      // it needs the reciprocal to actually slow gravity/velocity/bullets down in sync
-      // with everything else.
-      const scale = this.bulletTimeActive ? BULLET_TIME_MULTIPLIER : 1;
-      this.physics.world.timeScale = 1 / scale;
-      this.time.timeScale = scale;
-      this.tweens.timeScale = scale;
-      this.anims.globalTimeScale = scale;
-    }
+    this.applyBulletTimeToggle();
 
     // --- bullet-time-scaled delta, used for all charge/dash/cooldown timing ---
     const scaledDelta = delta * this.time.timeScale;
@@ -980,6 +1382,25 @@ export class GameScene extends Phaser.Scene {
     // against the current camera transform once per frame, before any of that runs.
     this.input.activePointer.updateWorldPoint(this.cameras.main);
 
+    // --- hint recording (dev tool): captures the same raw input this frame's
+    // player.update() call is about to act on, so the recorded frame and the actual
+    // resulting movement always match. Uses scaledDelta (bullet-time included), since
+    // that's what "amount of game action" actually happened this frame -- see
+    // HintPlayback's doc comment in HintReplay.js for why playback paces itself off
+    // that instead of raw dt. The actual recordFrame() call is deferred until after
+    // player.update() runs, below -- see the comment there for why. ---
+    let hintInputs;
+    if (HINT_RECORDING_ENABLED) {
+      hintInputs = {
+        left: this.cursors.left.isDown || this.keys.A.isDown,
+        right: this.cursors.right.isDown || this.keys.D.isDown,
+        up: this.cursors.up.isDown || this.keys.W.isDown,
+        down: this.cursors.down.isDown || this.keys.S.isDown,
+        fire: this.input.activePointer.leftButtonDown() || this.keys.SPACE.isDown,
+        dash: this.input.activePointer.rightButtonDown() || this.keys.Q.isDown,
+      };
+    }
+
     // --- delegate all player input/movement/dash/charge handling to the Player entity ---
     this.player.update(time, delta, scaledDelta, {
       cursors: this.cursors,
@@ -987,6 +1408,22 @@ export class GameScene extends Phaser.Scene {
       pointer: this.input.activePointer,
       bulletGroup: this.playerBullets,
     });
+
+    // --- hint recording (dev tool), continued: only now, after player.update() has
+    // actually run, do we know whether a shot fired or a dash triggered this tick --
+    // and, critically, at what angle. That can't be read off the raw input above:
+    // CHARGE-mode weapons fire on RELEASE (Player.updateChargeFire), while
+    // COOLDOWN-mode weapons and dashing fire on PRESS, or on any later held frame
+    // the instant their cooldown clears (Player.updateCooldownFire, and the dash
+    // check in Player.update()) -- there's no single input-edge rule that covers
+    // both. So this reads the real event straight from Player.js's own
+    // firedThisFrame/dashedThisFrame (+ firedAngle/dashedAngle) flags, set inside
+    // fireWeapon()/startDash(), rather than guessing from button transitions here. ---
+    if (HINT_RECORDING_ENABLED) {
+      const shotFired = this.player.firedThisFrame || this.player.dashedThisFrame;
+      const shotAngle = this.player.firedThisFrame ? this.player.firedAngle : this.player.dashedAngle;
+      this.hintRecorder.recordFrame(scaledDelta, hintInputs, shotAngle, shotFired);
+    }
 
     // --- charge-ready indicator: shown while a CHARGE-mode weapon is held at full
     // charge, tracking the pointer each frame; removed the instant it isn't (charge

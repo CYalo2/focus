@@ -14,6 +14,23 @@ const BUTTON_ICON_COLOR = 0xffffff;
 const BUTTON_ICON_ALPHA_IDLE = 0.5;  // faint by default so they don't compete with gameplay
 const BUTTON_ICON_ALPHA_HOVER = 1;   // full opacity once the pointer finds them
 
+// Timer text color: normal white, or a slightly red tint when the level's time
+// limit came from challenge mode (challengeTimeMs) instead of the regular
+// timeLimitMs -- a subtle visual cue that the clock running is the tighter one.
+const TIMER_COLOR_NORMAL = "#ffffff";
+const TIMER_COLOR_CHALLENGE = "#ff9999";
+
+// Small bordered chip behind the timer text -- same dark-translucent-fill-plus-
+// accent-border language as the rest of the UI (see the tooltip's backgroundColor
+// below, and the modal panels in PauseMenu.js/LevelSelectScene.js), so the timer
+// reads as a HUD element rather than bare text floating over gameplay.
+const TIMER_BG_COLOR = 0x000000;
+const TIMER_BG_ALPHA = 0.55;
+const TIMER_BORDER_COLOR = 0x3aa0ff; // same accent blue as the modal panel borders
+const TIMER_BORDER_WIDTH = 1;
+const TIMER_PADDING_X = 14;
+const TIMER_PADDING_Y = 6;
+
 // Hamburger icon (three horizontal bars) for the pause button.
 function drawPauseIcon(scene, x, y, size) {
   const g = scene.add.graphics({ x, y }).setScrollFactor(0);
@@ -71,7 +88,12 @@ function drawRetryIcon(scene, x, y, size) {
 }
 
 export class Hud {
-  constructor(scene, { hasTimer = false, hasEnemies = true } = {}) {
+  // showControlButtons: pass false during hint playback -- the pause/retry buttons
+  // (and their pointer-glued tooltip) act on real gameplay state (this.isPaused,
+  // scene.restart()) that hint playback deliberately bypasses via keydown-E/R being
+  // skipped in GameScene (see the isHintPlayback guards there), so showing buttons
+  // that no longer do anything meaningful would be misleading during a preview.
+  constructor(scene, { hasTimer = false, challengeMode = false, hasEnemies = true, showControlButtons = true } = {}) {
     this.scene = scene;
 
     this.container = scene.add.container(0, 0).setScrollFactor(0).setDepth(100);
@@ -89,42 +111,64 @@ export class Hud {
     // Only created when the level actually has a time limit -- levels without one
     // (the default) show no timer display at all.
     if (hasTimer) {
-      this.timerText = scene.add.text(640, 16, '', { fontSize: '20px', color: '#ffffff' }).setOrigin(0.5, 0);
+      this.timerText = scene.add.text(640, 16 + TIMER_PADDING_Y, '', {
+        fontSize: '20px',
+        color: challengeMode ? TIMER_COLOR_CHALLENGE : TIMER_COLOR_NORMAL
+      }).setOrigin(0.5, 0);
+
+      // Sized off timerText's own bounds (plus padding) rather than a fixed guess,
+      // and kept in sync every frame in update() -- since formatTime()'s output can
+      // change width mid-level (e.g. "9:59" -> "10:00", or losing a leading digit as
+      // the clock winds down), a fixed-size box would either clip longer strings or
+      // look loose around shorter ones. Added to the container BEFORE timerText so it
+      // renders behind it, same back-to-front ordering as everything else here.
+      this.timerBg = scene.add.rectangle(
+        640, 16 + TIMER_PADDING_Y + this.timerText.height / 2,
+        this.timerText.width + TIMER_PADDING_X * 2,
+        this.timerText.height + TIMER_PADDING_Y * 2,
+        TIMER_BG_COLOR, TIMER_BG_ALPHA
+      ).setStrokeStyle(TIMER_BORDER_WIDTH, TIMER_BORDER_COLOR).setScrollFactor(0);
+
+      this.container.add(this.timerBg);
       this.container.add(this.timerText);
     }
 
     this.bulletTimeVignette = scene.add.rectangle(0, 0, 1280, 720, 0x3aa0ff, 0).setOrigin(0).setScrollFactor(0).setDepth(99);
 
     // --- top-right icon buttons ---
-    const pauseBtnX = 1280 - BUTTON_MARGIN - BUTTON_SIZE / 2;
-    const pauseBtnY = BUTTON_MARGIN + BUTTON_SIZE / 2;
-    const retryBtnX = pauseBtnX - BUTTON_SIZE - BUTTON_GAP;
-    const retryBtnY = pauseBtnY;
+    // Skipped entirely during hint playback (showControlButtons: false) -- see the
+    // constructor doc comment above.
+    if (showControlButtons) {
+      const pauseBtnX = 1280 - BUTTON_MARGIN - BUTTON_SIZE / 2;
+      const pauseBtnY = BUTTON_MARGIN + BUTTON_SIZE / 2;
+      const retryBtnX = pauseBtnX - BUTTON_SIZE - BUTTON_GAP;
+      const retryBtnY = pauseBtnY;
 
-    // Tooltip is created before the buttons that reference it, but added to the
-    // container LAST (below) so it renders on top of everything else in the HUD --
-    // container child order is what controls stacking here, same as PauseMenu's
-    // overlay/panel/buttons ordering.
-    this.tooltipText = scene.add.text(0, 0, '', {
-      fontSize: '13px',
-      color: '#ffffff',
-      backgroundColor: '#000000cc',
-      padding: { x: 6, y: 4 },
-    }).setOrigin(1, 0).setScrollFactor(0).setVisible(false);
+      // Tooltip is created before the buttons that reference it, but added to the
+      // container LAST (below) so it renders on top of everything else in the HUD --
+      // container child order is what controls stacking here, same as PauseMenu's
+      // overlay/panel/buttons ordering.
+      this.tooltipText = scene.add.text(0, 0, '', {
+        fontSize: '13px',
+        color: '#ffffff',
+        backgroundColor: '#000000cc',
+        padding: { x: 6, y: 4 },
+      }).setOrigin(1, 0).setScrollFactor(0).setVisible(false);
 
-    this.pauseButton = this.createIconButton(scene, pauseBtnX, pauseBtnY, drawPauseIcon, 'Press E to Pause', () => scene.togglePause());
-    this.retryButton = this.createIconButton(scene, retryBtnX, retryBtnY, drawRetryIcon, 'Press R to Retry', () => scene.retryLevel());
+      this.pauseButton = this.createIconButton(scene, pauseBtnX, pauseBtnY, drawPauseIcon, 'Press E to Pause', () => scene.togglePause());
+      this.retryButton = this.createIconButton(scene, retryBtnX, retryBtnY, drawRetryIcon, 'Press R to Retry', () => scene.retryLevel());
 
-    this.container.add(this.tooltipText);
+      this.container.add(this.tooltipText);
 
-    // Keeps the tooltip glued to the pointer while it's visible. Positioned to the
-    // upper-left of the cursor (anchored via origin(1,0)) rather than the more usual
-    // lower-right, since both buttons sit right at the top-right corner of the screen
-    // -- anchoring rightward would constantly clip the tooltip off the edge of the
-    // canvas.
-    scene.input.on('pointermove', (pointer) => {
-      if (this.tooltipText.visible) this.positionTooltip(pointer);
-    });
+      // Keeps the tooltip glued to the pointer while it's visible. Positioned to the
+      // upper-left of the cursor (anchored via origin(1,0)) rather than the more usual
+      // lower-right, since both buttons sit right at the top-right corner of the screen
+      // -- anchoring rightward would constantly clip the tooltip off the edge of the
+      // canvas.
+      scene.input.on('pointermove', (pointer) => {
+        if (this.tooltipText.visible) this.positionTooltip(pointer);
+      });
+    }
   }
 
   // Builds one square icon button: an invisible rectangle (the actual interactive
@@ -179,6 +223,10 @@ export class Hud {
 
     if (this.timerText && timeRemainingMs !== null && timeRemainingMs !== undefined) {
       this.timerText.setText(formatTime(timeRemainingMs));
+      this.timerBg.setSize(
+        this.timerText.width + TIMER_PADDING_X * 2,
+        this.timerText.height + TIMER_PADDING_Y * 2
+      );
     }
   }
 }

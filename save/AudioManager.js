@@ -26,16 +26,33 @@ export async function initAudioManager(game) {
     soundManager = game.sound;
     soundManager.volume = await getMusicVolume();
 
+    // Phaser's built-in pauseOnBlur pauses sound on its own internal BLUR event,
+    // which fires on BOTH a plain window blur (alt-tab to another app/window/
+    // devtools, tab still visible) AND the tab actually going hidden -- one flag,
+    // two different situations. We only want the second one, and only want it to
+    // happen in lockstep with whatever already pauses the game itself on a real
+    // tab-out, so this turns the built-in behavior off entirely and instead listens
+    // to document.visibilitychange directly -- the browser's actual "is this tab
+    // currently visible" signal, which doesn't fire on a plain window blur. This
+    // needs to be set/attached before any sound starts playing, hence here.
+    soundManager.pauseOnBlur = false;
+    document.addEventListener("visibilitychange", () => {
+        if (!soundManager) return;
+        if (document.hidden) {
+            soundManager.pauseAll();
+        } else {
+            soundManager.resumeAll();
+        }
+    });
+
     // Checked directly (not via SaveManager's USE_SDK flag) -- USE_SDK only picks
     // where save data is written, but this should listen for the host's audio
     // setting any time the CrazyGames SDK is actually present, e.g. whenever the
     // game is running embedded on crazygames.com, regardless of that flag.
     //
-    // NOTE: `addSettingsChangeListener` and its `muteAudio` field are documented at
-    // https://docs.crazygames.com/sdk/game/ -- worth double-checking against the
-    // current docs for your SDK version before shipping, since the JS-side property
-    // for reading the *current* settings on load (used below) wasn't explicit in
-    // what I could confirm, only the listener for *changes*.
+    // `addSettingsChangeListener` and the synchronous `game.settings` property (used
+    // below to read the *current* value on load, not just future changes) are both
+    // confirmed current per https://docs.crazygames.com/sdk/game/ as of this check.
     if (window.CrazyGames?.SDK?.game?.addSettingsChangeListener) {
         const applySdkSettings = (settings) => {
             sdkMuted = !!settings?.muteAudio;
@@ -65,4 +82,50 @@ export async function setVolume(value) {
 
 export function isSdkMuted() {
     return sdkMuted;
+}
+
+// BiquadFilterNode spliced between masterVolumeNode and destination while bullet
+// time is active; null otherwise.
+let bulletTimeFilter = null;
+
+// Routes all game audio through a lowpass filter for a muffled slow-mo effect,
+// inserted directly into Phaser's WebAudioSoundManager master chain -- each Sound
+// connects to masterMuteNode, which feeds masterVolumeNode, which feeds destination
+// (soundManager.destination, normally just ctx.destination). This splices the filter
+// in at that last link only (masterVolumeNode -> filter -> destination) and never
+// touches masterMuteNode -- rewiring masterMuteNode's side instead would leave its
+// existing edge into masterVolumeNode intact and create a closed loop that never
+// reaches the speakers at all, which is a much louder failure than "no effect."
+// Same "one shared instance affects everything" principle as volume/mute above, so
+// it applies to whatever's playing right now and anything that starts playing
+// later, with no per-track bookkeeping. No-op if the browser fell back to Phaser's
+// HTML5AudioSoundManager (no Web Audio graph to splice into) -- bullet time just
+// won't have an audio effect there.
+export function setBulletTimeAudioEffect(active) {
+    if (!soundManager?.context || !soundManager.masterVolumeNode) return;
+
+    const ctx = soundManager.context;
+    // NOTE: soundManager.destination is NOT the final speaker output -- per Phaser's
+    // own docs it's "the destination node for connecting individual sounds to," i.e.
+    // it's another reference to masterMuteNode (upstream of masterVolumeNode), not
+    // downstream of it. Using it here would recreate the exact masterMuteNode <->
+    // masterVolumeNode loop this function exists to avoid. ctx.destination (the
+    // actual AudioContext/hardware output) is the only correct node to splice in
+    // front of.
+    const destination = ctx.destination;
+
+    if (active && !bulletTimeFilter) {
+        bulletTimeFilter = ctx.createBiquadFilter();
+        bulletTimeFilter.type = "lowpass";
+        bulletTimeFilter.frequency.value = 2000; // Hz
+
+        soundManager.masterVolumeNode.disconnect();
+        soundManager.masterVolumeNode.connect(bulletTimeFilter);
+        bulletTimeFilter.connect(destination);
+    } else if (!active && bulletTimeFilter) {
+        soundManager.masterVolumeNode.disconnect();
+        bulletTimeFilter.disconnect();
+        soundManager.masterVolumeNode.connect(destination);
+        bulletTimeFilter = null;
+    }
 }

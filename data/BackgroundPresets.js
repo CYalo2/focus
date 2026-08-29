@@ -61,10 +61,10 @@ export const BACKGROUND_PRESETS = [
         width: 1110, height: 720,
         unlockAfterLevel: 6,
         platforms: [
-            { x1: 180, y1: 230, x2: 380, y2: 260, type: "oneway" },
-            { x1: 180, y1: 520, x2: 380, y2: 550, type: "oneway" },
-            { x1: 730, y1: 230, x2: 930, y2: 260, type: "oneway" },
-            { x1: 730, y1: 520, x2: 930, y2: 550, type: "oneway" },
+            { x1: 265, y1: 230, x2: 465, y2: 260, type: "oneway" },
+            { x1: 265, y1: 520, x2: 465, y2: 550, type: "oneway" },
+            { x1: 815, y1: 230, x2: 1015, y2: 260, type: "oneway" },
+            { x1: 815, y1: 520, x2: 1015, y2: 550, type: "oneway" },
         ]
     },
     {

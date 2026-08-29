@@ -1,4 +1,5 @@
 import { BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, GOAL_BASE_TINT } from "../data/Constants.js";
+import { notifyLoadingStop } from "../save/SaveManager.js";
 
 export class BootScene extends Phaser.Scene {
 
@@ -210,6 +211,12 @@ export class BootScene extends Phaser.Scene {
             key: "blaster_weapon_cooldown",
             frames: this.anims.generateFrameNumbers("blaster_weapon", { start: 1, end: 1 }),
         });
+
+        // Everything the game needs (textures, generated graphics, anims) is ready and
+        // MenuScene is about to take over -- tell CrazyGames loading is done. Pairs
+        // with the notifyLoadingStart() call in main.js, made right as the game began
+        // booting.
+        notifyLoadingStop();
 
         this.scene.start("MenuScene");
     }

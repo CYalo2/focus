@@ -1,10 +1,11 @@
 import { LEVELS } from "../data/Levels.js";
-import { getBestTime, isLevelComplete } from "../save/SaveManager.js";
+import { getBestTime, isLevelComplete, isSdkEnabled, showBanner, hideBanner, getChallengeMode } from "../save/SaveManager.js";
 import { formatTime } from "../data/TimeUtils.js";
-import { initAudioManager, getVolume, setVolume, isSdkMuted } from "../save/AudioManager.js";
+import { initAudioManager } from "../save/AudioManager.js";
+import { buildSettingsRows, SETTINGS_ROWS_BOTTOM_OFFSET } from "../save/SettingsPanel.js";
 import { createBackground } from "../ui/PlatformBackground.js";
 import { getCurrentBackground, rerollBackground } from "../ui/BackgroundManager.js";
-import { fadeIn, fadeToScene } from "../ui/SceneTransitions.js";
+import { fadeIn, fadeToScene } from "../fx/SceneTransitions.js";
 
 const COLS = 3;
 const ROWS = 2;
@@ -13,7 +14,14 @@ const TILE_SIZE = 180;
 const TILE_GAP = 40;
 const TILE_BORDER_WIDTH = 2; // width of each of the tile card's two stroked borders (outer UI color + inner level-preview color)
 const MODAL_BORDER_WIDTH = 2; // same doubled-border treatment, sized for the level-details modal panel
+const TIME_LIMIT_COLOR_CHALLENGE = "#ff9999"; // matches Hud.js's TIMER_COLOR_CHALLENGE
 const GRID_TOP_Y = 220; // top edge of the grid, below the "SELECT LEVEL" title
+
+// Must match the id of the container div in index.html.
+const LEVEL_SELECT_BANNER_CONTAINER_ID = "level-select-banner-container";
+// Gates the level-select banner ad -- shown only once the player has some real
+// progress in, rather than on their very first visit to this screen.
+const MIN_LEVELS_COMPLETED_FOR_BANNER = 5;
 
 export class LevelSelectScene extends Phaser.Scene {
 
@@ -42,7 +50,14 @@ export class LevelSelectScene extends Phaser.Scene {
         // own level *relative to* the shared master volume AudioManager controls.
         this.music = this.sound.add("level_select", { loop: true, volume: 0.5 });
         this.music.play();
-        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.music.stop());
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            this.music.stop();
+            // Safety net: the PLAY button (and the SPACE shortcut) leave for GameScene
+            // without going through the modal's own closeModal(), which is what
+            // normally hides/clears this -- without this, the banner could otherwise
+            // still be showing the next time this scene starts back up.
+            this.hideLevelSelectBanner();
+        });
 
         // Set once the player uses the arrows -- refreshProgress() only jumps to the
         // "furthest unlocked level" page while this is still false, so it doesn't yank
@@ -165,21 +180,28 @@ export class LevelSelectScene extends Phaser.Scene {
         // Arrow keys (and A/D) mirror the on-screen </> buttons -- changePage()
         // already has all the bounds/unlock guards, so these just forward into it.
         // event.repeat guard so holding a key pages once per press instead of
-        // machine-gunning through pages at OS key-repeat rate.
+        // machine-gunning through pages at OS key-repeat rate. While the level-details
+        // modal is open, these instead drive its own prev/next-level arrows -- the
+        // page arrows underneath are covered by the modal overlay at that point, so
+        // the keys re-target navigateModalLevel() rather than changePage().
         this.input.keyboard.on("keydown-LEFT", (event) => {
             if (event.repeat) return;
+            if (this.modalContainer) { this.navigateModalLevel(-1); return; }
             this.changePage(-1);
         });
         this.input.keyboard.on("keydown-RIGHT", (event) => {
             if (event.repeat) return;
+            if (this.modalContainer) { this.navigateModalLevel(1); return; }
             this.changePage(1);
         });
         this.input.keyboard.on("keydown-A", (event) => {
             if (event.repeat) return;
+            if (this.modalContainer) { this.navigateModalLevel(-1); return; }
             this.changePage(-1);
         });
         this.input.keyboard.on("keydown-D", (event) => {
             if (event.repeat) return;
+            if (this.modalContainer) { this.navigateModalLevel(1); return; }
             this.changePage(1);
         });
 
@@ -355,7 +377,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
             if (unlocked) {
                 card.setInteractive({ useHandCursor: true });
-                card.on("pointerover", () => card.setStrokeStyle(borderWidth, 0x3aa0ff));
+                card.on("pointerover", () => card.setStrokeStyle(borderWidth, LEVELS[i].backgroundColor));
                 card.on("pointerout", () => card.setStrokeStyle(borderWidth, 0x555555));
                 card.on("pointerdown", () => this.openLevelDetails(i));
             }
@@ -410,10 +432,12 @@ export class LevelSelectScene extends Phaser.Scene {
         // you haven't beaten yet, instead of the tile being unresponsive.
         let bestTimeMs = null;
         let completed = false;
+        let challengeModeEnabled = false;
         try {
-            [bestTimeMs, completed] = await Promise.all([
+            [bestTimeMs, completed, challengeModeEnabled] = await Promise.all([
                 getBestTime(levelIndex),
                 isLevelComplete(levelIndex),
+                getChallengeMode(),
             ]);
         } catch (err) {
             console.error(`Failed to load save data for level ${levelIndex}:`, err);
@@ -423,10 +447,39 @@ export class LevelSelectScene extends Phaser.Scene {
         // details) while that save data was loading -- don't pop up a stale modal.
         if (!this.scene.isActive() || this.modalContainer) return;
 
-        this.showLevelDetailsModal(level, levelIndex, bestTimeMs, completed);
+        this.showLevelDetailsModal(level, levelIndex, bestTimeMs, completed, challengeModeEnabled);
     }
 
-    showLevelDetailsModal(level, levelIndex, bestTimeMs, completed) {
+    // Backs the modal's own </> arrows (and the arrow-key/A-D shortcuts while the
+    // modal is open). Tears down the current modal and reopens on the neighboring
+    // level -- reusing openLevelDetails() rather than mutating the open modal in
+    // place, so the new level's save data (best time / completed) is loaded fresh
+    // instead of carried over stale from the level being left.
+    navigateModalLevel(delta) {
+        if (!this.modalContainer) return;
+
+        const newIndex = this.modalLevelIndex + delta;
+        if (newIndex < 0 || newIndex >= LEVELS.length) return;
+        if (!this.isLevelUnlocked(newIndex)) return;
+
+        // The grid behind the modal follows along too, e.g. arrowing from the last
+        // level on a page onto the first level of the next -- rebuilt here (rather
+        // than going through changePage(), which also validates the target page has
+        // an unlocked level on it) since newIndex already being unlocked guarantees
+        // that.
+        const newPage = Math.floor(newIndex / PAGE_SIZE);
+        if (newPage !== this.page) {
+            this.page = newPage;
+            this.hasNavigated = true;
+            this.buildPage();
+        }
+
+        this.modalContainer.destroy();
+        this.modalContainer = null;
+        this.openLevelDetails(newIndex);
+    }
+
+    showLevelDetailsModal(level, levelIndex, bestTimeMs, completed, challengeModeEnabled) {
         const { width, height } = this.scale;
 
         this.modalLevelIndex = levelIndex;
@@ -439,18 +492,12 @@ export class LevelSelectScene extends Phaser.Scene {
         // topmost hit target for clicks inside the panel -- Phaser only dispatches
         // pointerdown to the topmost interactive object under the pointer, so this is
         // what stops a click on the panel from also being seen as an overlay click.
+        // Border doubled in width (matching the tile cards) and tinted with this
+        // level's own backgroundColor instead of a fixed blue, since with only one
+        // color needed now there's no reason for a second nested rectangle.
         const panel = this.add.rectangle(width / 2, height / 2, 420, 380, 0x1a1a22)
-            .setStrokeStyle(MODAL_BORDER_WIDTH, 0x3aa0ff)
+            .setStrokeStyle(MODAL_BORDER_WIDTH * 2, level.backgroundColor)
             .setInteractive();
-
-        // Same doubled-border treatment as the level select tiles: an inset
-        // rectangle, borders flush, tinted with this level's own backgroundColor so
-        // the modal previews the color the level opens into before you press play.
-        const panelInnerBorder = this.add.rectangle(
-            width / 2, height / 2,
-            420 - MODAL_BORDER_WIDTH * 2,
-            380 - MODAL_BORDER_WIDTH * 2
-        ).setStrokeStyle(MODAL_BORDER_WIDTH, level.backgroundColor);
 
         const title = this.add.text(width / 2, height / 2 - 150, level.name, {
             fontSize: "28px",
@@ -462,12 +509,18 @@ export class LevelSelectScene extends Phaser.Scene {
             color: "#cccccc"
         }).setOrigin(0.5);
 
-        const timeLimitLabel = level.timeLimitMs !== undefined
-            ? `Time limit: ${formatTime(level.timeLimitMs)}`
+        // Mirrors GameScene's own challenge-mode fallback: prefer challengeTimeMs
+        // while challenge mode is on, but fall back to the regular timeLimitMs for
+        // levels that don't define a challenge-specific one, so the preview always
+        // matches whatever time limit the level will actually be played with.
+        const usingChallengeTime = challengeModeEnabled && level.challengeTimeMs !== undefined;
+        const activeTimeLimitMs = usingChallengeTime ? level.challengeTimeMs : level.timeLimitMs;
+        const timeLimitLabel = activeTimeLimitMs !== undefined
+            ? `${usingChallengeTime ? "Challenge time limit" : "Time limit"}: ${formatTime(activeTimeLimitMs)}`
             : "Time limit: none";
         const timeLimitText = this.add.text(width / 2, height / 2 - 50, timeLimitLabel, {
             fontSize: "18px",
-            color: "#cccccc"
+            color: usingChallengeTime ? TIME_LIMIT_COLOR_CHALLENGE : "#cccccc"
         }).setOrigin(0.5);
 
         const bestTimeLabel = completed ? `Best time: ${formatTime(bestTimeMs)}` : "Not completed yet";
@@ -486,13 +539,55 @@ export class LevelSelectScene extends Phaser.Scene {
             color: "#888888"
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
+        // Prev/next-level arrows flanking the panel -- separate from (and in front
+        // of) the page arrows underneath, which stay hidden behind the modal overlay
+        // while this is open. Hidden entirely when there's no level in that
+        // direction at all (levelIndex is the first/last level); shown greyed-out
+        // and non-interactive, same treatment as the page arrows, when a level is
+        // there but still locked.
+        const hasPrevLevel = levelIndex > 0;
+        const hasNextLevel = levelIndex < LEVELS.length - 1;
+        const prevUnlocked = hasPrevLevel && this.isLevelUnlocked(levelIndex - 1);
+        const nextUnlocked = hasNextLevel && this.isLevelUnlocked(levelIndex + 1);
+
+        const modalLeftArrow = this.add.text(width / 2 - 260, height / 2, "<", {
+            fontSize: "32px",
+            color: prevUnlocked ? "#3aa0ff" : "#555555"
+        }).setOrigin(0.5).setVisible(hasPrevLevel);
+
+        const modalRightArrow = this.add.text(width / 2 + 260, height / 2, ">", {
+            fontSize: "32px",
+            color: nextUnlocked ? "#3aa0ff" : "#555555"
+        }).setOrigin(0.5).setVisible(hasNextLevel);
+
+        if (prevUnlocked) {
+            modalLeftArrow.setInteractive({ useHandCursor: true });
+            modalLeftArrow.on("pointerover", () => modalLeftArrow.setColor("#ffffff"));
+            modalLeftArrow.on("pointerout", () => modalLeftArrow.setColor("#3aa0ff"));
+            modalLeftArrow.on("pointerdown", () => this.navigateModalLevel(-1));
+        }
+        if (nextUnlocked) {
+            modalRightArrow.setInteractive({ useHandCursor: true });
+            modalRightArrow.on("pointerover", () => modalRightArrow.setColor("#ffffff"));
+            modalRightArrow.on("pointerout", () => modalRightArrow.setColor("#3aa0ff"));
+            modalRightArrow.on("pointerdown", () => this.navigateModalLevel(1));
+        }
+
         this.modalContainer = this.add.container(0, 0, [
-            overlay, panel, panelInnerBorder, title, enemiesText, timeLimitText, bestTimeText, playButton, closeButton
+            overlay, panel, title, enemiesText, timeLimitText, bestTimeText, playButton, closeButton,
+            modalLeftArrow, modalRightArrow
         ]);
+
+        // Only once the player has some real progress in, and only when actually
+        // running with the CrazyGames SDK -- see showLevelSelectBanner() below.
+        const completedCount = this.completed.filter(Boolean).length;
+        const eligibleForBanner = isSdkEnabled() && completedCount >= MIN_LEVELS_COMPLETED_FOR_BANNER;
+        if (eligibleForBanner) this.showLevelSelectBanner();
 
         const closeModal = () => {
             this.modalContainer.destroy(); // exclusive=true by default, so this destroys its children too
             this.modalContainer = null;
+            if (eligibleForBanner) this.hideLevelSelectBanner();
         };
 
         overlay.on("pointerdown", closeModal);
@@ -503,62 +598,128 @@ export class LevelSelectScene extends Phaser.Scene {
         playButton.on("pointerout", () => playButton.setColor("#3aa0ff"));
     }
 
+    // Reveals the DOM banner container (see index.html) and asks CrazyGames to fill
+    // it. Idempotent -- checked via the container's own display style rather than a
+    // separate flag -- so reopening the modal via navigateModalLevel() (which tears
+    // down and rebuilds the modal without going through closeModal()) doesn't
+    // re-request a banner that's already showing. CrazyGames enforces its own
+    // minimum delay between requests for the same container anyway, but avoiding the
+    // redundant call here means normal prev/next browsing never comes close to it.
+    showLevelSelectBanner() {
+        const container = document.getElementById(LEVEL_SELECT_BANNER_CONTAINER_ID);
+        if (!container || container.style.display === "block") return;
+        container.style.display = "block";
+        showBanner(LEVEL_SELECT_BANNER_CONTAINER_ID);
+    }
+
+    // Hides the container and tells CrazyGames to clear it -- recommended by
+    // CrazyGames' own docs so stale ad content doesn't flash back up the next time a
+    // banner is requested for this same container id.
+    hideLevelSelectBanner() {
+        const container = document.getElementById(LEVEL_SELECT_BANNER_CONTAINER_ID);
+        if (container) container.style.display = "none";
+        hideBanner(LEVEL_SELECT_BANNER_CONTAINER_ID);
+    }
+
     openSettings() {
         // Don't stack this modal on top of a level-details modal (or itself, if the
         // button is somehow double-clicked before the first modal finishes opening).
         if (this.modalContainer || this.settingsModalContainer) return;
 
+        // Flag checked by showSettingsModal after its async autoAim read resolves --
+        // cleared the moment the modal actually closes, so a stale read doesn't pop
+        // the modal back up after the player already dismissed it.
+        this.settingsModalOpening = true;
         this.showSettingsModal();
     }
 
-    // Same plain -/+ volume row as PauseMenu's, in its own small modal here since
-    // this scene otherwise has no "settings" surface at all.
-    showSettingsModal() {
+    // Same "settings" modal as PauseMenu's -- the volume and autoaim rows are built
+    // by the shared buildSettingsRows (see SettingsPanel.js) so both screens' settings
+    // stay identical instead of drifting as two separate copies. Async because that
+    // builder itself awaits the autoAim read -- mirrors the guard in
+    // PauseMenu.showPauseMenu, since the player could close this modal (or leave the
+    // scene) while that read is still in flight.
+    async showSettingsModal() {
         const { width, height } = this.scale;
 
-        const VOLUME_STEP = 0.1;
+        // --- layout ---
+        // Rather than anchoring the title to a fixed offset from height/2 (which only
+        // looked centered for however many settings rows existed when that number was
+        // last tuned), the whole content block -- title through the close link -- is
+        // measured first via these gaps and half-heights, then centered as a unit on
+        // height/2. Add a row in SettingsPanel.js and the block grows, but it grows
+        // evenly around the same vertical center instead of drifting off it.
+        const TITLE_HALF_HEIGHT = 14; // 28px title font
+        const GAP_TITLE_TO_ROWS_CENTER = 110;
+        const CLOSE_GAP_AFTER_ROWS = 35;
+        const CLOSE_HALF_HEIGHT = 8; // 16px close-link font
+
+        const blockHeight = TITLE_HALF_HEIGHT
+            + GAP_TITLE_TO_ROWS_CENTER
+            + SETTINGS_ROWS_BOTTOM_OFFSET
+            + CLOSE_GAP_AFTER_ROWS
+            + CLOSE_HALF_HEIGHT;
+        const blockTop = height / 2 - blockHeight / 2;
+        const blockBottom = blockTop + blockHeight;
+
+        const titleY = blockTop + TITLE_HALF_HEIGHT;
+        const rowsCenterY = titleY + GAP_TITLE_TO_ROWS_CENTER;
+
+        // Close link sits relative to the BOTTOM of the settings rows (via
+        // SETTINGS_ROWS_BOTTOM_OFFSET) rather than a fixed offset, so adding/removing
+        // a row in SettingsPanel.js automatically pushes it down/up instead of the
+        // row block silently overlapping it.
+        const rowsBottomY = rowsCenterY + SETTINGS_ROWS_BOTTOM_OFFSET;
+        const closeY = rowsBottomY + CLOSE_GAP_AFTER_ROWS;
+
+        // Panel wraps the content block with an equal margin on both top and bottom,
+        // so it's centered on height/2 right along with the content it wraps --
+        // asymmetric margins here would push the panel (though not the content inside
+        // it) visibly off-center.
+        const PANEL_MARGIN = 35;
+        const PANEL_WIDTH = 380;
+        const panelTop = blockTop - PANEL_MARGIN;
+        const panelBottom = blockBottom + PANEL_MARGIN;
+        const panelHeight = panelBottom - panelTop;
+        const panelCenterY = (panelTop + panelBottom) / 2;
 
         const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.7)
             .setOrigin(0)
             .setInteractive();
 
-        const panel = this.add.rectangle(width / 2, height / 2, 380, 260, 0x1a1a22)
+        const panel = this.add.rectangle(width / 2, panelCenterY, PANEL_WIDTH, panelHeight, 0x1a1a22)
             .setStrokeStyle(2, 0x3aa0ff)
             .setInteractive();
 
-        const title = this.add.text(width / 2, height / 2 - 90, "SETTINGS", {
+        const title = this.add.text(width / 2, titleY, "SETTINGS", {
             fontSize: "28px",
             color: "#ffffff"
         }).setOrigin(0.5);
 
-        const volumeLabelBase = "MUSIC VOLUME";
-        const volumeLabel = this.add.text(
-            width / 2, height / 2 - 40,
-            isSdkMuted() ? `${volumeLabelBase} (muted by host)` : volumeLabelBase,
-            { fontSize: "14px", color: "#888888" }
-        ).setOrigin(0.5);
+        const settingsRows = await buildSettingsRows(this, width / 2, rowsCenterY);
 
-        const volumeDown = this.add.text(width / 2 - 80, height / 2, "-", { fontSize: "28px", color: "#3aa0ff" })
-            .setOrigin(0.5).setInteractive({ useHandCursor: true });
+        // The player may have closed this modal (or left the scene) while that read
+        // was in flight -- don't build a settings modal nobody asked for anymore.
+        if (!this.settingsModalOpening || !this.scene.isActive()) {
+            settingsRows.forEach((obj) => obj.destroy());
+            overlay.destroy();
+            panel.destroy();
+            title.destroy();
+            return;
+        }
 
-        const volumeText = this.add.text(width / 2, height / 2, `${Math.round(getVolume() * 100)}%`, {
-            fontSize: "20px", color: "#ffffff"
-        }).setOrigin(0.5);
-
-        const volumeUp = this.add.text(width / 2 + 80, height / 2, "+", { fontSize: "28px", color: "#3aa0ff" })
-            .setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-        const closeButton = this.add.text(width / 2, height / 2 + 90, "close", {
+        const closeButton = this.add.text(width / 2, closeY, "close", {
             fontSize: "16px",
             color: "#888888"
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         this.settingsModalContainer = this.add.container(0, 0, [
-            overlay, panel, title, volumeLabel, volumeDown, volumeText, volumeUp, closeButton
+            overlay, panel, title, ...settingsRows, closeButton
         ]);
         this.settingsModalContainer.setDepth(1000);
 
         const closeModal = () => {
+            this.settingsModalOpening = false;
             this.settingsModalContainer.destroy();
             this.settingsModalContainer = null;
             this.input.keyboard.off("keydown-SPACE", closeOnKey);
@@ -578,19 +739,6 @@ export class LevelSelectScene extends Phaser.Scene {
         // create() only acts while a level-details modal is open, not this one.
         this.input.keyboard.on("keydown-SPACE", closeOnKey);
         this.input.keyboard.on("keydown-E", closeOnKey);
-
-        volumeDown.on("pointerdown", async () => {
-            const newVolume = await setVolume(getVolume() - VOLUME_STEP);
-            volumeText.setText(`${Math.round(newVolume * 100)}%`);
-        });
-        volumeUp.on("pointerdown", async () => {
-            const newVolume = await setVolume(getVolume() + VOLUME_STEP);
-            volumeText.setText(`${Math.round(newVolume * 100)}%`);
-        });
-        volumeDown.on("pointerover", () => volumeDown.setColor("#ffffff"));
-        volumeDown.on("pointerout", () => volumeDown.setColor("#3aa0ff"));
-        volumeUp.on("pointerover", () => volumeUp.setColor("#ffffff"));
-        volumeUp.on("pointerout", () => volumeUp.setColor("#3aa0ff"));
 
         overlay.on("pointerdown", closeModal);
         closeButton.on("pointerdown", closeModal);

@@ -1,4 +1,5 @@
 import { LEVELS } from "../data/Levels.js";
+import { requestRewardedAd } from "../save/SaveManager.js";
 
 // Formats a millisecond duration as M:SS.mm (e.g. 83450 -> "1:23.45"). Only used for
 // the completion-time display below, so it doesn't need to handle hours/negatives --
@@ -10,9 +11,44 @@ function formatTime(ms) {
   return `${minutes}:${seconds}`;
 }
 
+// Gates the hint replay behind a CrazyGames rewarded ad (a no-op passthrough when
+// USE_SDK is false -- see requestRewardedAd() in SaveManager.js). Disables the
+// button and swaps its label for the duration of the ad request, per CrazyGames'
+// own guidelines against letting the player interact while an ad is loading/
+// showing -- re-enabling it on failure so an unfilled/errored ad doesn't strand the
+// player without a hint, rather than granting the reward anyway.
+function requestHintReplay(scene, hintButton) {
+  const originalLabel = hintButton.text;
+  hintButton.disableInteractive();
+  hintButton.setText('[ ... ]');
+
+  requestRewardedAd({
+    // The scene is already fully paused/silent behind the end screen (winLevel()/
+    // loseLevel() already stopped physics, tweens, and music before this ever
+    // renders) -- muting the SoundManager on top of that covers any incidental UI
+    // sound so it doesn't play under the ad.
+    onAdStart: () => { scene.sound.mute = true; },
+    onAdEnd: () => { scene.sound.mute = false; },
+  }).then((watched) => {
+    if (watched) {
+      // Restarts this same level with hintPlayback: true -- GameScene.init() picks
+      // that up and, instead of live input, drives the player/enemies through the
+      // level's recorded hintReplay script (see GameScene.updateHintPlayback()).
+      scene.scene.restart({ levelIndex: scene.levelIndex, hintPlayback: true });
+    } else {
+      // Ad was unfilled, errored, or blocked -- don't grant the hint, just let the
+      // player try again.
+      hintButton.setText(originalLabel);
+      hintButton.setInteractive({ useHandCursor: true });
+    }
+  });
+}
+
 // Win/lose overlay: title, retry button, next-level button (only when won and another
-// level exists), and a link back to the level select screen. Fully self-contained --
-// only reads scene.levelIndex, doesn't touch any other scene state.
+// level exists), a HINT button (only on a genuine loss when this level has a recorded
+// hintReplay -- see GameScene.updateHintPlayback()), and a link back to the level
+// select screen. Fully self-contained -- only reads scene.levelIndex/scene.isHintPlayback,
+// doesn't touch any other scene state.
 //
 // timeMs and isNewBest are optional and only ever displayed when won is true -- callers
 // on the lose path (GameScene.loseLevel) simply omit them.
@@ -49,16 +85,31 @@ export function showEndScreen(scene, title, color, won, timeMs, isNewBest) {
     }
   }
 
+  const hasNext = won && scene.levelIndex < LEVELS.length - 1;
+  // A HINT button shows on a genuine loss when this level has a recorded hint replay
+  // -- but not on the screen shown *after* a hint plays out (scene.isHintPlayback is
+  // still true at that point, since nothing resets it until the next real
+  // restart/start), so the button doesn't offer to replay the replay. On a genuine
+  // loss where this level simply has no recorded hintReplay, a disabled "No Hints"
+  // label takes that same row instead, so the layout doesn't shift between levels
+  // that do and don't have one.
+  const hasHintReplay = !!LEVELS[scene.levelIndex]?.hintReplay;
+  const showHint = !won && !scene.isHintPlayback && hasHintReplay;
+  const showNoHints = !won && !scene.isHintPlayback && !hasHintReplay;
+
   // Buttons sit a bit lower when the time line (and possibly the new-best line above
   // it) is showing, so they don't overlap it.
   const buttonY = showTime ? (isNewBest ? 430 : 400) : 380;
-  const menuY = buttonY + 50;
+  // HINT (or the "No Hints" label) sits in its own row below RETRY rather than
+  // beside it, so it doesn't need NEXT LEVEL's extra horizontal room -- only pushes
+  // menuY down to make space.
+  const hintY = buttonY + 45;
+  const menuY = ((showHint || showNoHints) ? hintY : buttonY) + 50;
 
   const panelTop = 200;
   const panelBottom = menuY + 80;
 
-  const hasNext = won && scene.levelIndex < LEVELS.length - 1;
-  const panelWidth = hasNext ? 580 : 500; // was 520 / 460
+  const panelWidth = hasNext ? 580 : 500; // was 520 / 460 -- HINT stacks vertically, doesn't need the wider panel
 
   const panel = scene.add.rectangle(
     640,
@@ -82,6 +133,25 @@ export function showEndScreen(scene, title, color, won, timeMs, isNewBest) {
     next.on('pointerdown', () => scene.scene.start('GameScene', { levelIndex: scene.levelIndex + 1 }));
     retry.setX(500);
     children.push(next);
+  }
+
+  if (showHint) {
+    const hint = scene.add.text(640, hintY, '[ HINT ]', { fontSize: '24px', color: '#ffd23a' })
+      .setOrigin(0.5).setScrollFactor(0).setInteractive({ useHandCursor: true });
+    // Restarts this same level with hintPlayback: true -- GameScene.init() picks that
+    // up and, instead of live input, drives the player/enemies through the level's
+    // recorded hintReplay script (see GameScene.updateHintPlayback()). Ends on its own
+    // once the script runs out, showing a fresh end screen (retry / level select only
+    // -- see endHintPlayback()). Gated behind a rewarded ad when USE_SDK is true -- see
+    // requestHintReplay() above.
+    hint.on('pointerdown', () => requestHintReplay(scene, hint));
+    children.push(hint);
+  } else if (showNoHints) {
+    // Non-interactive -- just communicates that this level has no recorded hint
+    // to fall back on, in the same row/style slot the HINT button would occupy.
+    const noHints = scene.add.text(640, hintY, '| NO HINT |', { fontSize: '24px', color: '#ff4d4d' })
+      .setOrigin(0.5).setScrollFactor(0);
+    children.push(noHints);
   }
 
   const menu = scene.add.text(640, menuY, 'back to level select', { fontSize: '16px', color: '#888888' })
