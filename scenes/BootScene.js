@@ -1,4 +1,4 @@
-import { BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, GOAL_BASE_TINT } from "../data/Constants.js";
+import { BULLET_PLAYER_TINT, BULLET_ENEMY_TINT, CHARGE_VIGNETTE_COLOR, CHARGE_VIGNETTE_MAX_ALPHA, GAME_WIDTH, GAME_HEIGHT } from "../data/Constants.js";
 import { notifyLoadingStop } from "../save/SaveManager.js";
 
 export class BootScene extends Phaser.Scene {
@@ -20,58 +20,61 @@ export class BootScene extends Phaser.Scene {
         this.load.image("breakable_tile", "assets/tile/breakable_tile.png");
         this.load.image("bounce_tile", "assets/tile/bounce_tile.png");
 
-        this.load.audio('menu', 'assets/music/Menu.wav');
-        this.load.audio('level_select', 'assets/music/Level Select.wav');
+        this.load.audio('menu', 'assets/music/Menu.ogg');
+        this.load.audio('level_select', 'assets/music/Level Select.ogg');
 
-        this.load.audio('uplifting', 'assets/music/Uplifting.wav');
-        this.load.audio('barrage', 'assets/music/Barrage.wav');
-        this.load.audio('rebuttal', 'assets/music/Rebuttal.wav');
-        this.load.audio('alacrity', 'assets/music/Alacrity.wav');
-        this.load.audio('counter', 'assets/music/Counter.wav');
-        this.load.audio('counter2', 'assets/music/Counter2.wav');
+        this.load.audio('uplifting', 'assets/music/Uplifting.ogg');
+        this.load.audio('barrage', 'assets/music/Barrage.ogg');
+        this.load.audio('rebuttal', 'assets/music/Rebuttal.ogg');
+        this.load.audio('alacrity', 'assets/music/Alacrity.ogg');
+        this.load.audio('mystery', 'assets/music/Mystery.ogg');
+        this.load.audio('counter', 'assets/music/Counter.ogg');
+        this.load.audio('countenance', 'assets/music/Countenance.ogg');
     }
     
     create() {
 
         const g = this.add.graphics();
 
-        // Platform
         g.clear();
         g.fillStyle(0xffffff, 1);
         g.fillRect(0, 0, 32, 32);
         g.generateTexture("platform", 32, 32);
 
-        // Player Bullet -- elongated rectangle so rotation reads clearly as a direction.
-        // Drawn pointing along local +x, which lines up with rotation = 0 in Phaser's
-        // angle convention (and with velocityFromRotation(0, ...) also pointing +x).
         g.clear();
         g.fillStyle(BULLET_PLAYER_TINT, 1);
-        g.fillRect(0, 0, 16, 4);
-        g.generateTexture("bulletPlayer", 12, 4);
+        g.fillRect(0, 0, 8, 2);
+        g.generateTexture("bulletPlayer", 6, 2);
 
-        // Enemy Bullet -- same shape/orientation convention as the player bullet.
         g.clear();
         g.fillStyle(BULLET_ENEMY_TINT, 1);
-        g.fillRect(0, 0, 16, 4);
-        g.generateTexture("bulletEnemy", 12, 4);
+        g.fillRect(0, 0, 8, 2);
+        g.generateTexture("bulletEnemy", 6, 2);
 
-        // Goal
-        g.clear();
-        g.fillStyle(GOAL_BASE_TINT, 1);
-        g.fillRect(0, 0, 10, 60);
-        g.fillRect(10, 0, 30, 20);
-        g.generateTexture("goal", 40, 60);
-
-        // Particle -- plain white so fx/Particles.js can freely tint it any color
-        // (multiplying a colored tint against white gives back that exact color,
-        // unlike tinting white-on-white which is the invisible no-op described
-        // earlier for hit flashes).
         g.clear();
         g.fillStyle(0xffffff, 1);
-        g.fillCircle(4, 4, 4);
-        g.generateTexture("particle", 8, 8);
+        g.fillCircle(2, 2, 2);
+        g.generateTexture("particle", 4, 4);
 
         g.destroy();
+
+        const vignetteWidth = GAME_WIDTH;
+        const vignetteHeight = GAME_HEIGHT;
+        const vignetteCanvas = this.textures.createCanvas("chargeVignette", vignetteWidth, vignetteHeight);
+        const vctx = vignetteCanvas.getContext();
+        const vcx = vignetteWidth / 2;
+        const vcy = vignetteHeight / 2;
+        const outerR = Math.hypot(vcx, vcy);
+        const innerR = outerR * 0.35;
+        const vr = (CHARGE_VIGNETTE_COLOR >> 16) & 0xff;
+        const vg = (CHARGE_VIGNETTE_COLOR >> 8) & 0xff;
+        const vb = CHARGE_VIGNETTE_COLOR & 0xff;
+        const vignetteGradient = vctx.createRadialGradient(vcx, vcy, innerR, vcx, vcy, outerR);
+        vignetteGradient.addColorStop(0, `rgba(${vr}, ${vg}, ${vb}, 0)`);
+        vignetteGradient.addColorStop(1, `rgba(${vr}, ${vg}, ${vb}, ${CHARGE_VIGNETTE_MAX_ALPHA})`);
+        vctx.fillStyle = vignetteGradient;
+        vctx.fillRect(0, 0, vignetteWidth, vignetteHeight);
+        vignetteCanvas.refresh();
 
         this.anims.create({
             key: "player_idle",
@@ -212,10 +215,6 @@ export class BootScene extends Phaser.Scene {
             frames: this.anims.generateFrameNumbers("blaster_weapon", { start: 1, end: 1 }),
         });
 
-        // Everything the game needs (textures, generated graphics, anims) is ready and
-        // MenuScene is about to take over -- tell CrazyGames loading is done. Pairs
-        // with the notifyLoadingStart() call in main.js, made right as the game began
-        // booting.
         notifyLoadingStop();
 
         this.scene.start("MenuScene");

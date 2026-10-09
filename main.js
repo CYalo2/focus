@@ -1,61 +1,49 @@
-import { GRAVITY, BACKGROUND_COLOR } from "./data/Constants.js";
+import { GRAVITY, BACKGROUND_COLOR, GAME_WIDTH, GAME_HEIGHT } from "./data/Constants.js";
 
 import { BootScene } from "./scenes/BootScene.js";
 import { MenuScene } from "./scenes/MenuScene.js";
 import { LevelSelectScene } from "./scenes/LevelSelectScene.js";
 import { GameScene } from "./scenes/GameScene.js";
+import { setZoom, applyDisplayCamera } from "./ui/DisplayScale.js";
+import { installPixelTextDefaults, loadPixelFonts } from "./ui/PixelText.js";
 import { isAllowedDomain, notifyLoadingStart } from "./save/SaveManager.js";
 
-// Sitelock check -- see SaveManager.js. A no-op locally/off-CrazyGames while
-// USE_SDK is false; once USE_SDK is flipped to true this blocks the game from
-// running anywhere except an official crazygames.* domain.
 if (!isAllowedDomain()) {
     const container = document.getElementById("game-container");
     container.textContent = "Available only on CrazyGames.";
     container.style.color = "#fff";
     container.style.fontSize = "20px";
 } else {
-    // Tell CrazyGames asset loading is beginning. The matching notifyLoadingStop()
-    // belongs in BootScene once its preload() finishes and the game is actually
-    // playable -- not here, since Phaser.Game(config) below is just the start of
-    // that process, not the end of it.
     notifyLoadingStart();
-    startGame();
+    installPixelTextDefaults();
+    loadPixelFonts().then(startGame);
 }
 
 function startGame() {
 
+const initialLayout = computeLayout();
+setZoom(initialLayout.zoom);
+
 const config = {
     type: Phaser.AUTO,
 
-    width: 1280,
-    height: 720,
+    width: initialLayout.width,
+    height: initialLayout.height,
 
     parent: "game-container",
 
     backgroundColor: BACKGROUND_COLOR,
 
     pixelArt: true,
+    roundPixels: true,
 
-    // FIT scales the canvas to the largest size that fits #game-container while
-    // keeping the 1280x720 (16:9) aspect ratio intact -- no stretching/distortion --
-    // and CENTER_BOTH centers the result within it. CrazyGames embeds the game in
-    // iframes of varying sizes (desktop, mobile, different site layouts), and without
-    // this the canvas would just render at a fixed 1280x720 regardless of how much
-    // room it's actually given. See index.html for the matching #game-container CSS
-    // this scales into.
+    // Rendered at screen resolution (see ui/DisplayScale.js); the size is set from the window below.
     scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        mode: Phaser.Scale.NONE,
+        zoom: 1 / (window.devicePixelRatio || 1),
+        autoCenter: Phaser.Scale.NO_CENTER // centred by fitToWindow instead, on a whole device pixel
     },
 
-    // CrazyGames' own integration docs call this out explicitly: embedded in their
-    // iframe, the page itself (not just the game) would otherwise scroll whenever the
-    // player presses spacebar or an arrow key, since that's the browser's default
-    // behavior for those keys. Capturing them here (globally, for every scene) calls
-    // preventDefault() on them before that can happen. This only affects the keys
-    // listed -- WASD/Q/E/R/P/O (see GameScene.js) aren't browser-scroll keys and don't
-    // need it.
     input: {
         keyboard: {
             capture: [
@@ -86,6 +74,33 @@ const config = {
     ]
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Largest whole number of *device* pixels per game pixel that fits the window (so it stays crisp on
+// 125%/150% display scaling too). Below 1x the game just shrinks to fit.
+function computeLayout() {
+    const dpr = window.devicePixelRatio || 1;
+    const fit = Math.min(window.innerWidth * dpr / GAME_WIDTH, window.innerHeight * dpr / GAME_HEIGHT);
+    const zoom = fit >= 1 ? Math.floor(fit) : fit;
+    return { dpr, zoom, width: Math.round(GAME_WIDTH * zoom), height: Math.round(GAME_HEIGHT * zoom) };
+}
+
+function fitToWindow() {
+    const { dpr, zoom, width, height } = computeLayout();
+    setZoom(zoom);
+    game.scale.resize(width, height);
+    game.scale.setZoom(1 / dpr);
+    game.scale.refresh();
+    game.scene.getScenes(true).forEach(applyDisplayCamera);
+
+    // Centre on a whole device pixel too; a half-pixel offset also makes everything uneven.
+    const container = document.getElementById("game-container");
+    const offsetX = Math.max(0, Math.floor((window.innerWidth * dpr - width) / 2));
+    const offsetY = Math.max(0, Math.floor((window.innerHeight * dpr - height) / 2));
+    container.style.left = `${offsetX / dpr}px`;
+    container.style.top = `${offsetY / dpr}px`;
+}
+window.addEventListener("resize", fitToWindow);
+game.events.once(Phaser.Core.Events.READY, fitToWindow);
 
 }

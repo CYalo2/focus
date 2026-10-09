@@ -7,55 +7,43 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.70.0/phaser.min.js"></script>
 
 <style>
+@font-face {
+    font-family: 'Silkscreen';
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+    src: url('assets/fonts/silkscreen-latin-400-normal.woff2') format('woff2');
+}
+
 html, body {
     margin: 0;
     padding: 0;
     background: #111;
     height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-family: Arial, sans-serif;
+    overflow: hidden;
+    font-family: 'Silkscreen', 'Courier New', monospace;
 }
 
 #game-container {
-    position: relative;
-    /* Caps at the game's native 1280x720 on anything that size or larger (matching
-       the old fixed behavior exactly), and shrinks proportionally -- via aspect-ratio,
-       so it always stays 16:9 -- on smaller iframes/mobile screens. Phaser's Scale
-       Manager (see main.js's scale: { mode: FIT, autoCenter: CENTER_BOTH }) then fits
-       the canvas into whatever size this resolves to. Without an explicit size here,
-       FIT would have no actual box to scale against.
-
-       NOTE: #level-select-banner-container below is positioned with fixed pixel
-       offsets that assume this container is rendered at its full 1280x720 -- once it
-       shrinks below that (small iframes/mobile), those offsets will land in the wrong
-       place relative to the visible canvas. That's a pre-existing assumption this
-       change exposes rather than something this change caused; revisit it (e.g.
-       percentage-based positioning, or repositioning it on the Scale Manager's
-       'resize' event) if the banner needs to look right on those smaller sizes too. */
-    width: min(100vw, 1280px);
-    max-height: 100vh;
-    aspect-ratio: 16 / 9;
+    position: absolute;
+    line-height: 0;
     box-shadow: 0 0 24px rgba(0,0,0,.6);
 }
 
-/* CrazyGames renders the level-select banner ad into this real DOM element -- it
-   can't be drawn on the Phaser canvas, since it's actual ad content (often an
-   iframe), not a game sprite. Positioned to sit just below the level-details modal
-   panel (420x380, centered in the 1280x720 canvas -> bottom edge at y=550) and sized
-   to the "320x50" responsive banner size CrazyGames is expected to pick for a
-   container this size. Hidden by default; LevelSelectScene toggles this via
-   style.display once it knows both USE_SDK is on and the player has completed
-   enough levels -- see save/SaveManager.js's showBanner()/hideBanner(). */
 #level-select-banner-container {
     display: none;
     position: absolute;
-    left: 480px;
-    top: 570px;
+    left: 50%;
+    bottom: 0;
+    transform: translateX(-50%);
     width: 320px;
     height: 50px;
     z-index: 10;
+}
+
+#game-container canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 </style>
 </head>

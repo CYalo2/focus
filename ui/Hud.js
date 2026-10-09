@@ -1,40 +1,31 @@
 import { formatTime } from "../data/TimeUtils.js";
+import { GAME_WIDTH, GAME_HEIGHT } from "../data/Constants.js";
+import { crispStroke } from "./PixelRect.js";
+import { pointerToGame } from "./DisplayScale.js";
+import { isChargeVignetteEnabled } from "../save/SaveManager.js";
 
-// Fixed-to-camera HUD: hint text, enemies-left counter, back-to-menu button, the
-// bullet-time vignette, an optional time-limit display top-middle, and the top-right
-// pause/retry icon buttons (with a follow-the-mouse tooltip). Everything here uses
-// setScrollFactor(0) so it stays pinned to the screen, unlike world-space objects
-// (platforms, level text, etc.) which scroll with the camera.
-
-// --- top-right icon buttons: layout/styling constants ---
-const BUTTON_SIZE = 36;
-const BUTTON_MARGIN = 14; // gap from the screen edges
-const BUTTON_GAP = 10;    // gap between the two buttons
+const BUTTON_SIZE = 20;
+const BUTTON_MARGIN = 8;
+const BUTTON_GAP = 6;
 const BUTTON_ICON_COLOR = 0xffffff;
-const BUTTON_ICON_ALPHA_IDLE = 0.5;  // faint by default so they don't compete with gameplay
-const BUTTON_ICON_ALPHA_HOVER = 1;   // full opacity once the pointer finds them
+const BUTTON_ICON_ALPHA_IDLE = 0.5;
+const BUTTON_ICON_ALPHA_HOVER = 1;
 
-// Timer text color: normal white, or a slightly red tint when the level's time
-// limit came from challenge mode (challengeTimeMs) instead of the regular
-// timeLimitMs -- a subtle visual cue that the clock running is the tighter one.
 const TIMER_COLOR_NORMAL = "#ffffff";
 const TIMER_COLOR_CHALLENGE = "#ff9999";
 
-// Small bordered chip behind the timer text -- same dark-translucent-fill-plus-
-// accent-border language as the rest of the UI (see the tooltip's backgroundColor
-// below, and the modal panels in PauseMenu.js/LevelSelectScene.js), so the timer
-// reads as a HUD element rather than bare text floating over gameplay.
 const TIMER_BG_COLOR = 0x000000;
 const TIMER_BG_ALPHA = 0.55;
-const TIMER_BORDER_COLOR = 0x3aa0ff; // same accent blue as the modal panel borders
+const TIMER_BORDER_COLOR = 0x3aa0ff;
 const TIMER_BORDER_WIDTH = 1;
-const TIMER_PADDING_X = 14;
-const TIMER_PADDING_Y = 6;
+const TIMER_PADDING_X = 7;
+const TIMER_PADDING_Y = 3;
 
-// Hamburger icon (three horizontal bars) for the pause button.
+const CHARGE_VIGNETTE_FADE_MS = 150;
+
 function drawPauseIcon(scene, x, y, size) {
   const g = scene.add.graphics({ x, y }).setScrollFactor(0);
-  g.lineStyle(3, BUTTON_ICON_COLOR, 1);
+  g.lineStyle(2, BUTTON_ICON_COLOR, 1);
   const barWidth = size * 0.5;
   const spacing = size * 0.22;
   [-1, 0, 1].forEach((i) => {
@@ -46,24 +37,17 @@ function drawPauseIcon(scene, x, y, size) {
   return g;
 }
 
-// "Spinny arrow" refresh icon (a partial ring + arrowhead) for the retry button.
 function drawRetryIcon(scene, x, y, size) {
   const g = scene.add.graphics({ x, y }).setScrollFactor(0);
   const radius = size * 0.27;
-  g.lineStyle(3, BUTTON_ICON_COLOR, 1);
+  g.lineStyle(2, BUTTON_ICON_COLOR, 1);
 
-  // ~260-degree arc, leaving a gap where the arrowhead sits so it reads as motion
-  // rather than a closed circle.
   const startAngle = -Math.PI * 0.68;
   const endAngle = Math.PI * 0.58;
   g.beginPath();
   g.arc(0, 0, radius, startAngle, endAngle, false);
   g.strokePath();
 
-  // Arrowhead at the end of the arc: the tip is pushed outward along the tangent
-  // (past the arc's own radius) so it forms a proper point rather than sitting flush
-  // with the ring, and the two back corners hug the arc so the head reads as a
-  // continuation of the sweep instead of a bolted-on triangle.
   const tangent = endAngle + Math.PI / 2;
   const cos = Math.cos(tangent);
   const sin = Math.sin(tangent);
@@ -88,71 +72,49 @@ function drawRetryIcon(scene, x, y, size) {
 }
 
 export class Hud {
-  // showControlButtons: pass false during hint playback -- the pause/retry buttons
-  // (and their pointer-glued tooltip) act on real gameplay state (this.isPaused,
-  // scene.restart()) that hint playback deliberately bypasses via keydown-E/R being
-  // skipped in GameScene (see the isHintPlayback guards there), so showing buttons
-  // that no longer do anything meaningful would be misleading during a preview.
   constructor(scene, { hasTimer = false, challengeMode = false, hasEnemies = true, showControlButtons = true } = {}) {
     this.scene = scene;
 
     this.container = scene.add.container(0, 0).setScrollFactor(0).setDepth(100);
 
-    // Only created for levels that actually have enemies -- a level with none has
-    // nothing meaningful to count down, so this stays hidden entirely rather than
-    // sitting there permanently reading "All enemies defeated". Sits a bit lower than
-    // it used to (y: 56 instead of 40) so it never crowds the pause/retry buttons
-    // above it, even though their x-ranges don't actually overlap.
     if (hasEnemies) {
-      this.enemiesLeftText = scene.add.text(1180, 56, '', { fontSize: '16px', color: '#e24b4a' }).setOrigin(1, 0);
+      this.enemiesLeftText = scene.add.text(GAME_WIDTH - 20, 32, '', { fontSize: '8px', color: '#e24b4a' }).setOrigin(1, 0);
       this.container.add(this.enemiesLeftText);
     }
 
-    // Only created when the level actually has a time limit -- levels without one
-    // (the default) show no timer display at all.
     if (hasTimer) {
-      this.timerText = scene.add.text(640, 16 + TIMER_PADDING_Y, '', {
-        fontSize: '20px',
+      this.timerText = scene.add.text(GAME_WIDTH / 2, 8 + TIMER_PADDING_Y, '', {
+        fontSize: '16px',
         color: challengeMode ? TIMER_COLOR_CHALLENGE : TIMER_COLOR_NORMAL
       }).setOrigin(0.5, 0);
 
-      // Sized off timerText's own bounds (plus padding) rather than a fixed guess,
-      // and kept in sync every frame in update() -- since formatTime()'s output can
-      // change width mid-level (e.g. "9:59" -> "10:00", or losing a leading digit as
-      // the clock winds down), a fixed-size box would either clip longer strings or
-      // look loose around shorter ones. Added to the container BEFORE timerText so it
-      // renders behind it, same back-to-front ordering as everything else here.
       this.timerBg = scene.add.rectangle(
-        640, 16 + TIMER_PADDING_Y + this.timerText.height / 2,
+        GAME_WIDTH / 2, 8 + TIMER_PADDING_Y + this.timerText.height / 2,
         this.timerText.width + TIMER_PADDING_X * 2,
         this.timerText.height + TIMER_PADDING_Y * 2,
         TIMER_BG_COLOR, TIMER_BG_ALPHA
       ).setStrokeStyle(TIMER_BORDER_WIDTH, TIMER_BORDER_COLOR).setScrollFactor(0);
+      crispStroke(this.timerBg);
 
       this.container.add(this.timerBg);
       this.container.add(this.timerText);
     }
 
-    this.bulletTimeVignette = scene.add.rectangle(0, 0, 1280, 720, 0x3aa0ff, 0).setOrigin(0).setScrollFactor(0).setDepth(99);
+    this.bulletTimeVignette = scene.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x3aa0ff, 0).setOrigin(0).setScrollFactor(0).setDepth(99);
+    this.chargeVignette = scene.add.image(0, 0, 'chargeVignette').setOrigin(0).setScrollFactor(0).setDepth(98).setAlpha(0);
+    this.chargeVignetteDisplayAlpha = 0;
 
-    // --- top-right icon buttons ---
-    // Skipped entirely during hint playback (showControlButtons: false) -- see the
-    // constructor doc comment above.
     if (showControlButtons) {
-      const pauseBtnX = 1280 - BUTTON_MARGIN - BUTTON_SIZE / 2;
+      const pauseBtnX = GAME_WIDTH - BUTTON_MARGIN - BUTTON_SIZE / 2;
       const pauseBtnY = BUTTON_MARGIN + BUTTON_SIZE / 2;
       const retryBtnX = pauseBtnX - BUTTON_SIZE - BUTTON_GAP;
       const retryBtnY = pauseBtnY;
 
-      // Tooltip is created before the buttons that reference it, but added to the
-      // container LAST (below) so it renders on top of everything else in the HUD --
-      // container child order is what controls stacking here, same as PauseMenu's
-      // overlay/panel/buttons ordering.
       this.tooltipText = scene.add.text(0, 0, '', {
-        fontSize: '13px',
+        fontSize: '8px',
         color: '#ffffff',
         backgroundColor: '#000000cc',
-        padding: { x: 6, y: 4 },
+        padding: { x: 3, y: 2 },
       }).setOrigin(1, 0).setScrollFactor(0).setVisible(false);
 
       this.pauseButton = this.createIconButton(scene, pauseBtnX, pauseBtnY, drawPauseIcon, 'Press E to Pause', () => scene.togglePause());
@@ -160,25 +122,13 @@ export class Hud {
 
       this.container.add(this.tooltipText);
 
-      // Keeps the tooltip glued to the pointer while it's visible. Positioned to the
-      // upper-left of the cursor (anchored via origin(1,0)) rather than the more usual
-      // lower-right, since both buttons sit right at the top-right corner of the screen
-      // -- anchoring rightward would constantly clip the tooltip off the edge of the
-      // canvas.
       scene.input.on('pointermove', (pointer) => {
         if (this.tooltipText.visible) this.positionTooltip(pointer);
       });
     }
   }
 
-  // Builds one square icon button: an invisible rectangle (the actual interactive
-  // hit area) plus a non-interactive icon drawn on top of it, which fades between
-  // idle/hover alpha in place of the old background-box hover state. Both pieces
-  // share the button's center (x, y) so the icon is automatically centered.
   createIconButton(scene, x, y, drawIcon, tooltipLabel, onClick) {
-    // No visible background box anymore -- this rectangle is purely an invisible hit
-    // area (alpha 0) so the button still has a comfortable click/hover target and the
-    // hand cursor, without drawing a panel behind the icon.
     const bg = scene.add.rectangle(x, y, BUTTON_SIZE, BUTTON_SIZE, 0x000000, 0)
       .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
@@ -210,16 +160,24 @@ export class Hud {
   }
 
   positionTooltip(pointer) {
-    this.tooltipText.setPosition(pointer.x - 16, pointer.y + 18);
+    const p = pointerToGame(pointer);
+    this.tooltipText.setPosition(p.x - 8, p.y + 9);
   }
 
-  // Called once per frame from GameScene.update() with the current state it needs to
-  // display. timeRemainingMs is null for levels with no time limit.
-  update({ enemiesLeft, bulletTimeActive, timeRemainingMs }) {
+  update({ enemiesLeft, bulletTimeActive, timeRemainingMs, chargeRatio = 0, delta = 16.7 }) {
     if (this.enemiesLeftText) {
       this.enemiesLeftText.setText(enemiesLeft === 0 ? 'All Enemies Defeated' : `Enemies left: ${enemiesLeft}`);
     }
     this.bulletTimeVignette.setFillStyle(0x3aa0ff, bulletTimeActive ? 0.08 : 0);
+
+    const targetChargeAlpha = isChargeVignetteEnabled() ? Phaser.Math.Clamp(chargeRatio, 0, 1) : 0;
+    if (targetChargeAlpha >= this.chargeVignetteDisplayAlpha) {
+      this.chargeVignetteDisplayAlpha = targetChargeAlpha;
+    } else {
+      const fadeStep = delta / CHARGE_VIGNETTE_FADE_MS;
+      this.chargeVignetteDisplayAlpha = Math.max(targetChargeAlpha, this.chargeVignetteDisplayAlpha - fadeStep);
+    }
+    this.chargeVignette.setAlpha(this.chargeVignetteDisplayAlpha);
 
     if (this.timerText && timeRemainingMs !== null && timeRemainingMs !== undefined) {
       this.timerText.setText(formatTime(timeRemainingMs));
@@ -227,6 +185,7 @@ export class Hud {
         this.timerText.width + TIMER_PADDING_X * 2,
         this.timerText.height + TIMER_PADDING_Y * 2
       );
+      crispStroke(this.timerBg);
     }
   }
 }

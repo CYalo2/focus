@@ -1,25 +1,8 @@
 import { PLATFORM_TYPES, PLATFORM_TINTS } from "../data/PlatformTypes.js";
-import { DEPTH, TILE_SIZE, BULLET_ENEMY_TINT } from "../data/Constants.js";
+import { DEPTH, TILE_SIZE, BULLET_ENEMY_TINT, GOAL_BASE_TINT } from "../data/Constants.js";
 import { lightenColor } from "../data/ColorUtils.js";
+import { getZoom, snapToDevicePixel } from "../ui/DisplayScale.js";
 
-// Builds the platform groups for a level from its platform list. Platforms are
-// defined by two opposite corners (x1,y1)-(x2,y2) rather than a center point + size --
-// order doesn't matter (top-left/bottom-right or the reverse both work), since
-// width/height come from the absolute difference and the tileSprite's center is just
-// the midpoint of the two corners.
-
-// Sets tilePosition so this tileSprite's pattern lines up with every other aligned
-// tileSprite in the world, regardless of where each one's own local origin falls.
-// The background TileSprite is anchored at world (0,0) with tilePosition (0,0) (see
-// GameScene.create()), so its tile pattern at any world point (wx, wy) shows texture
-// coordinate (wx mod TILE_SIZE, wy mod TILE_SIZE). A given sprite's local (0,0) --
-// its default-origin top-left corner -- sits at world (worldLeft, worldTop); setting
-// tilePosition to that same value mod TILE_SIZE makes the texture shown there match
-// what the background shows at that point, so patterns continue unbroken across
-// sprite edges instead of restarting at each sprite's own corner. tileScale shifts
-// the pattern's repeat period to TILE_SIZE * scale in world space while tilePosition
-// itself stays in pre-scale texture space, so both the modulo period and the offset
-// need to be divided through by the scale factor.
 function alignTileSprite(sprite, worldLeft, worldTop) {
   const scaleX = sprite.tileScaleX;
   const scaleY = sprite.tileScaleY;
@@ -29,65 +12,81 @@ function alignTileSprite(sprite, worldLeft, worldTop) {
   sprite.tilePositionY = (((worldTop % periodY) + periodY) % periodY) / scaleY;
 }
 
-// Draws a white arrow centered on a redirect platform, pointing along redirectAngle
-// (radians, 0 = pointing right/+x, matching the bullet rotation convention used
-// elsewhere). Built as a single filled polygon rather than separate shaft+head
-// shapes so it stays crisp at the 90-degree increments redirect platforms mostly
-// use, where every edge lands on a pixel-aligned horizontal/vertical line pre-rotation.
-function drawRedirectArrow(scene, rect, w, h, angle) {
-  const size = Math.min(w, h) * 0.6;
-  const shaftHalf = size * 0.08;
-  const headHalf = size * 0.22;
-  const headLength = size * 0.35;
+function rasterizeRedirectArrow(arrow, rect, w, h, angle) {
+  const zoom = getZoom();
+  const step = 1 / zoom;
+
+  const size = Math.max(7, Math.floor(Math.min(w, h) * 0.7));
   const halfLen = size / 2;
+  const headLength = Math.max(3, size * 0.45);
+  const headHalf = Math.max(2, size * 0.28);
+  const shaftHalf = Math.max(1, size * 0.1);
+  const shaftEnd = halfLen - headLength;
 
-  const arrow = scene.add.graphics();
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const reachPx = Math.ceil((Math.ceil(halfLen) + 1) * zoom);
+
+  arrow.clear();
   arrow.fillStyle(0xffffff, 1);
-  arrow.beginPath();
-  arrow.moveTo(-halfLen, -shaftHalf);
-  arrow.lineTo(halfLen - headLength, -shaftHalf);
-  arrow.lineTo(halfLen - headLength, -headHalf);
-  arrow.lineTo(halfLen, 0);
-  arrow.lineTo(halfLen - headLength, headHalf);
-  arrow.lineTo(halfLen - headLength, shaftHalf);
-  arrow.lineTo(-halfLen, shaftHalf);
-  arrow.closePath();
-  arrow.fillPath();
+  for (let py = -reachPx; py < reachPx; py++) {
+    let runStart = null;
+    for (let px = -reachPx; px <= reachPx; px++) {
+      let lit = false;
+      if (px < reachPx) {
+        const cx = (px + 0.5) * step;
+        const cy = (py + 0.5) * step;
+        const u = cx * cos + cy * sin;
+        const v = -cx * sin + cy * cos;
+        const inShaft = u >= -halfLen && u <= shaftEnd && Math.abs(v) <= shaftHalf;
+        const inHead = u > shaftEnd && u <= halfLen && Math.abs(v) <= headHalf * (halfLen - u) / headLength;
+        lit = inShaft || inHead;
+      }
 
-  arrow.setPosition(rect.x, rect.y);
-  arrow.setRotation(angle);
+      if (lit && runStart === null) runStart = px;
+      if (!lit && runStart !== null) {
+        arrow.fillRect(runStart * step, py * step, (px - runStart) * step, step);
+        runStart = null;
+      }
+    }
+  }
+
+  arrow.setPosition(snapToDevicePixel(rect.x), snapToDevicePixel(rect.y));
+}
+
+const redirectArrows = new Set();
+
+function drawRedirectArrow(scene, rect, w, h, angle) {
+  const arrow = scene.add.graphics();
   arrow.setDepth(DEPTH.platform + 1);
+  arrow.redirectSpec = { rect, w, h, angle };
+  rasterizeRedirectArrow(arrow, rect, w, h, angle);
+  redirectArrows.add(arrow);
   rect.redirectArrow = arrow;
 }
 
-const ONEWAY_TOP = 10;
+export function refreshRedirectArrows() {
+  redirectArrows.forEach(arrow => {
+    if (!arrow.scene || !arrow.active) {
+      redirectArrows.delete(arrow);
+      return;
+    }
+    const { rect, w, h, angle } = arrow.redirectSpec;
+    rasterizeRedirectArrow(arrow, rect, w, h, angle);
+  });
+}
 
-// Platform types whose exposed edges get a darkened outline (see
-// drawPlatformOutlines below). Just 'normal' for now, but kept as a list so
-// other types can opt in later without touching the drawing logic.
+const ONEWAY_TOP = 5;
+
 const OUTLINE_PLATFORM_TYPES = ['normal'];
 
-// Thickness (px) of the darkened outline strip.
-const BORDER_WIDTH = 2;
+const BORDER_WIDTH = 1;
 
-// Alpha of the black overlay used to "darken" the border. Drawn as a
-// semi-transparent black strip rather than a tinted color, since outline
-// platforms use the raw 'tile' texture (no flat base color to darken).
 const BORDER_DARKEN_ALPHA = 0.35;
 
-// Color/alpha for the separate outline pass drawn around bounceable
-// platforms (see bounceOutlineCandidates below) -- a pale green instead of
-// the darkened-black look used for OUTLINE_PLATFORM_TYPES, so bounceable
-// edges read as their own distinct thing rather than reusing the "shared
-// darken" language of normal platform outlines.
 const BOUNCE_OUTLINE_COLOR = 0x98fb98;
 const BOUNCE_OUTLINE_ALPHA = 0.2;
 
-// Builds a oneway platform as a tinted 'platform' top/bottom frame around an
-// interior filled with 'background_tile', tinted to match the level's background
-// (see GameScene's this.background.setTint call), instead of one flat tinted
-// rectangle. rect is the (invisible) physics tileSprite already sized/positioned
-// to the platform's full w x h -- this only adds decoration on top of it.
 function buildOnewayVisual(scene, rect, w, h, levelBackgroundColor) {
   const left = rect.x - w / 2;
   const top = rect.y - h / 2;
@@ -100,7 +99,7 @@ function buildOnewayVisual(scene, rect, w, h, levelBackgroundColor) {
   const makeStrip = (x, y, sw, sh) => {
     const strip = scene.add.tileSprite(x, y, sw, sh, 'tile');
     strip.setDepth(DEPTH.platform);
-    strip.setTileScale(2, 2);
+    strip.setTileScale(1, 1);
     alignTileSprite(strip, x - sw / 2, y - sh / 2);
     return strip;
   };
@@ -109,28 +108,69 @@ function buildOnewayVisual(scene, rect, w, h, levelBackgroundColor) {
 
   const inner = scene.add.tileSprite(rect.x, innerCy, w, innerH, 'background_tile');
   inner.setDepth(DEPTH.platform);
-  inner.setTileScale(2, 2);
+  inner.setTileScale(1, 1);
   inner.setTint(levelBackgroundColor !== undefined ? lightenColor(levelBackgroundColor, 0.2) : 0xffffff);
   alignTileSprite(inner, left, top + bTop);
 
-  // A thin darkened line along the very top edge, same look (width/alpha) as
-  // the outline drawn for OUTLINE_PLATFORM_TYPES, so oneway platforms read as
-  // clearly cappable-from-above without needing their own separate style.
   const topBorder = scene.add.graphics();
   topBorder.setDepth(DEPTH.platform + 1);
   topBorder.fillStyle(0x000000, BORDER_DARKEN_ALPHA);
   topBorder.fillRect(left, top, w, BORDER_WIDTH);
 
-  // The underlying rect stays invisible -- it exists purely to host the physics
-  // body -- while these pieces provide the actual visual.
   rect.setVisible(false);
   rect.onewayVisual = { topStrip, inner, topBorder };
 }
 
-// Subtracts a set of [a,b] ranges from [start,end] and returns whatever
-// sub-ranges are left over. Used to figure out which part of a platform's
-// edge is NOT shared with a touching neighbor, so only that part gets the
-// darkened border. coveredRanges may overlap each other and needn't be sorted.
+const GOAL_WIDTH = 20;
+const GOAL_HEIGHT = 30;
+const GOAL_BORDER = 2;
+
+export function createGoal(scene, x, y, levelBackgroundColor) {
+  const w = GOAL_WIDTH;
+  const h = GOAL_HEIGHT;
+  const border = GOAL_BORDER;
+
+  const left = x - w / 2;
+  const top = y - h / 2;
+  const right = x + w / 2;
+
+  const body = scene.add.tileSprite(x, y, w, h, 'tile');
+  body.setDepth(DEPTH.goal);
+  scene.physics.add.existing(body, true);
+  body.body.updateFromGameObject();
+  body.setVisible(false);
+
+  const makeStrip = (sx, sy, sw, sh, texture) => {
+    const strip = scene.add.tileSprite(sx, sy, sw, sh, texture);
+    strip.setDepth(DEPTH.goal);
+    strip.setTileScale(1, 1);
+    alignTileSprite(strip, sx - sw / 2, sy - sh / 2);
+    return strip;
+  };
+
+  const sideH = h - border;
+  const sideCy = top + border + sideH / 2;
+
+  const topStrip = makeStrip(x, top + border / 2, w, border, 'tile');
+  topStrip.setTint(GOAL_BASE_TINT);
+
+  const leftStrip = makeStrip(left + border / 2, sideCy, border, sideH, 'tile');
+  leftStrip.setTint(GOAL_BASE_TINT);
+
+  const rightStrip = makeStrip(right - border / 2, sideCy, border, sideH, 'tile');
+  rightStrip.setTint(GOAL_BASE_TINT);
+
+  const innerW = w - border * 2;
+  const inner = scene.add.tileSprite(x, sideCy, innerW, sideH, 'background_tile');
+  inner.setDepth(DEPTH.goal);
+  inner.setTileScale(1, 1);
+  inner.setTint(levelBackgroundColor !== undefined ? lightenColor(levelBackgroundColor, 0.2) : 0xffffff);
+  alignTileSprite(inner, left + border, top + border);
+
+  body.goalVisual = { topStrip, leftStrip, rightStrip, inner };
+  return body;
+}
+
 function subtractCoveredRanges(start, end, coveredRanges) {
   let segments = [[start, end]];
   coveredRanges.forEach(([a, b]) => {
@@ -148,40 +188,12 @@ function subtractCoveredRanges(start, end, coveredRanges) {
   return segments.filter(([s, e]) => e - s > 0.01);
 }
 
-// Draws an outline (color/alpha configurable, defaulting to the darkened-black
-// look) around the exposed edges of `platforms` (each {left, top, right,
-// bottom}). Where two platforms in the list share an edge (one's right lines
-// up with another's left, etc, with overlapping range on the perpendicular
-// axis), that shared portion is treated as interior -- no border is drawn
-// there -- so a contiguous cluster of platforms reads as one shape with a
-// single outline around its outside, rather than each platform getting its
-// own fully-boxed border. Called once for OUTLINE_PLATFORM_TYPES and again,
-// separately, for bounceable platforms with a pale green color/alpha.
-// wrapWidth/wrapHeight are only passed by the decorative background renderer
-// (see PlatformBackground.js) -- real levels call this via createPlatforms with
-// no wrap size, so these stay undefined there and every `wrapHeight &&` /
-// `wrapWidth &&` guard below short-circuits false, leaving level behavior
-// exactly as before.
 function drawPlatformOutlines(scene, platforms, color = 0x000000, alpha = BORDER_DARKEN_ALPHA, wrapWidth, wrapHeight) {
   const graphics = scene.add.graphics();
   graphics.setDepth(DEPTH.platform + 1);
   graphics.fillStyle(color, alpha);
 
   platforms.forEach(p => {
-    // Alongside the normal "shares this exact edge" match, also treat a platform
-    // as touching if it sits exactly one wrap-period away on the parallel axis --
-    // e.g. q.bottom === p.top + wrapHeight means q is at the very bottom of the
-    // tile (bottom === wrapHeight) while p is at the very top (top === 0), which
-    // is exactly the pair that ends up adjacent once a background tile repeats.
-    // q !== p is only required to guard the *non-wrap* match -- a platform can
-    // never be non-wrap-adjacent to itself (that would need its own top===bottom).
-    // For the wrap match, q === p is exactly the legitimate case where a single
-    // platform spans the tile's full wrap dimension and needs to wrap into its
-    // own next copy (e.g. a full-height side pillar) -- excluding self there was
-    // what left those platforms' seam borders undrawn-but-not-quite: they'd never
-    // find a *different* platform to wrap-match against, so the seam border never
-    // got suppressed. Splitting q !== p out per-branch lets self-matches through
-    // only where wrapping is actually active.
     const touchingAbove = platforms
       .filter(q => (q !== p || wrapHeight) && q.right > p.left && q.left < p.right &&
         (q.bottom === p.top || (wrapHeight && q.bottom === p.top + wrapHeight)))
@@ -214,10 +226,6 @@ function drawPlatformOutlines(scene, platforms, color = 0x000000, alpha = BORDER
   return graphics;
 }
 
-// wrapSize ({width, height}) is only used by the decorative background renderer
-// (see PlatformBackground.js) to make edge outlines connect across the seam
-// where one repeated tile ends and the next begins. Real levels never pass this,
-// so it stays undefined and outline behavior for them is unchanged.
 export function createPlatforms(scene, levelPlatforms, levelBackgroundColor, wrapSize) {
   const platformsNormal = scene.physics.add.staticGroup();
   const platformsOneway = scene.physics.add.staticGroup();
@@ -225,28 +233,13 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor, wra
   const platformsBounceable = scene.physics.add.staticGroup();
   const platformsEnemyPassthrough = scene.physics.add.staticGroup();
   const platformsBulletPassthrough = scene.physics.add.staticGroup();
-  // Not solid to anything -- GameScene only ever registers an overlap (never a
-  // collider) between the player and this group, purely to detect the touch and kill
-  // the player. No collider means nothing (player, enemies, or bullets) is ever
-  // physically blocked by it -- everything passes straight through, visually and
-  // physically, the same as oneway platforms do from below/the side.
+
   const platformsDeath = scene.physics.add.staticGroup();
-  // Also never a collider -- same passthrough treatment as platformsDeath. GameScene
-  // registers an overlap between this group and the bullet groups only (not the
-  // player or enemies) and calls redirectBullet() on hit; see Bullet.js.
+
   const platformsRedirect = scene.physics.add.staticGroup();
 
-  // Geometry (left/top/right/bottom) for every platform whose type is in
-  // OUTLINE_PLATFORM_TYPES, collected as we go so we can draw the darkened
-  // outline once all platforms exist -- outline-drawing needs to see every
-  // candidate at once to know which edges are shared vs exposed.
   const outlineCandidates = [];
 
-  // Geometry for every 'bounceable' platform, collected the same way as
-  // outlineCandidates above but kept separate since it feeds its own,
-  // independently-colored (pale green) outline pass -- see
-  // BOUNCE_OUTLINE_COLOR/BOUNCE_OUTLINE_ALPHA and the drawPlatformOutlines
-  // call below.
   const bounceOutlineCandidates = [];
 
   levelPlatforms.forEach(p => {
@@ -257,25 +250,11 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor, wra
     const cx = (p.x1 + p.x2) / 2;
     const cy = (p.y1 + p.y2) / 2;
 
-    // 'normal' platforms use the same 'tile' texture as GameScene's background,
-    // untinted, so they read as a cutout of the background rather than their own
-    // rectangle. 'breakable' platforms get the same blend-style treatment but with
-    // their own 'breakable_tile' texture instead, so cracks/damage read clearly
-    // without a flat tint washing them out. 'bulletPassthrough' also blends in with
-    // 'tile', tinted like the interior of a oneway platform (see buildOnewayVisual's
-    // `inner`) -- lightenColor(levelBackgroundColor, 0.5). 'enemyPassthrough' gets
-    // that same lightenColor(..., 0.5) treatment, but starting from BULLET_ENEMY_TINT
-    // instead of the background color, so it reads as the enemy-flavored version of
-    // the same see-through surface. 'bounceable' gets the same blend/untinted
-    // treatment as 'normal' (same alignTileSprite call below applies to it too), just
-    // with its own 'bounce_tile' texture instead of 'tile', so it reads as its own
-    // distinct surface without a flat tint washing it out. Every other type keeps the
-    // old 'platform' texture + type tint.
     const BLEND_TEXTURES = { normal: 'tile', breakable: 'breakable_tile', bulletPassthrough: 'background_tile', enemyPassthrough: 'tile', bounceable: 'bounce_tile' };
     const isBlendPlatform = type in BLEND_TEXTURES;
     const rect = scene.add.tileSprite(cx, cy, w, h, isBlendPlatform ? BLEND_TEXTURES[type] : 'platform');
     rect.setDepth(DEPTH.platform);
-    rect.setTileScale(2, 2);
+    rect.setTileScale(1, 1);
 
     const left = cx - w / 2;
     const top = cy - h / 2;
@@ -293,10 +272,6 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor, wra
       rect.setTint(PLATFORM_TINTS[type]);
       rect.baseTint = PLATFORM_TINTS[type];
     } else if (type === 'breakable') {
-      // Untinted (see BLEND_TEXTURES above), but damagePlatformAtPoint's hit-flash
-      // in GameScene still reads/restores rect.baseTint -- white is the tint that
-      // leaves the texture showing as-is, so flashing toward it and back is a no-op
-      // visually until the brighten kicks in, exactly like the tinted types above.
       rect.baseTint = 0xffffff;
     } else if (type === 'bulletPassthrough') {
       rect.setTint(levelBackgroundColor !== undefined ? lightenColor(levelBackgroundColor, 0.2) : 0xffffff);
@@ -322,8 +297,6 @@ export function createPlatforms(scene, levelPlatforms, levelBackgroundColor, wra
     } else if (type === 'death') {
       platformsDeath.add(rect);
     } else if (type === 'redirect') {
-      // p.direction is degrees (level-data convention), converted here to radians to
-      // match bullet.rotation / velocityFromRotation's convention everywhere else.
       const degrees = p.direction !== undefined ? p.direction : 0;
       rect.redirectAngle = degrees * (Math.PI / 180);
       platformsRedirect.add(rect);
