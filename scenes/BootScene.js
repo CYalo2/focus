@@ -30,6 +30,7 @@ export class BootScene extends Phaser.Scene {
         this.load.audio('mystery', 'assets/music/Mystery.ogg');
         this.load.audio('counter', 'assets/music/Counter.ogg');
         this.load.audio('countenance', 'assets/music/Countenance.ogg');
+        this.load.audio('countenance2', 'assets/music/Countenance 2.ogg');
     }
     
     create() {

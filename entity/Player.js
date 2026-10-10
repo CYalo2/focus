@@ -201,6 +201,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  refreshWeaponAim(pointer) {
+    const aimTarget = this.getAimTarget(pointer);
+    if (aimTarget.isEnemy) return;
+    const aimAngle = Phaser.Math.Angle.Between(this.x, this.y, aimTarget.x, aimTarget.y);
+    this.weaponSprite.rotation = aimAngle;
+    this.weaponSprite.x = this.x + Math.cos(aimAngle) * WEAPON_DISPLAY_DISTANCE;
+    this.weaponSprite.y = this.y + Math.sin(aimAngle) * WEAPON_DISPLAY_DISTANCE;
+  }
+
   updateChargeFire(scaledDelta, leftDown, leftReleasedThisFrame, isMouseTriggered, pointer, bulletGroup, suppressAutoFire = false) {
     if (leftDown && !this.isCharging && !this.isDashing) {
       this.isCharging = true;

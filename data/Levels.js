@@ -2004,7 +2004,7 @@ export const LEVELS = [
         music: "rebuttal",
     },
     {
-        name: "Remiss",
+        name: "Insular",
         worldBounds: {
             width: 640,
             height: 635
@@ -2124,5 +2124,33 @@ export const LEVELS = [
         open: false,
         backgroundColor: 0x4992a7,
         music: "mystery",
+    },
+    {
+        name: "Auspicious",
+        worldBounds: {
+            width: 640,
+            height: 360
+        },
+        playerSpawn: {
+            x: 320,
+            y: 325
+        },
+        timeLimitMs: 60000,
+        challengeTimeMs: 500,
+        platforms: [
+            { x1: 0, y1: 335, x2: 640, y2: 360, type: "normal" },
+        ],
+        texts: [
+        ],
+        enemies: [
+        ],
+        goal: {
+            x: 320,
+            y: 1000
+        },
+        weapon: "default",
+        open: true,
+        backgroundColor: 0x00dee8,
+        music: "countenance2",
     },
 ];

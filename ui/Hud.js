@@ -37,37 +37,20 @@ function drawPauseIcon(scene, x, y, size) {
   return g;
 }
 
-function drawRetryIcon(scene, x, y, size) {
+const RETRY_ICON_RECTS = [
+  [-5, -4, 7, 2],  // top bar
+  [-5, -2, 2, 8],  // left side
+  [-3, 4, 8, 2],   // bottom bar
+  [3, 2, 2, 2],    // right side
+  [2, -6, 1, 6],   // arrowhead, widest column
+  [3, -5, 1, 4],
+  [4, -4, 1, 2],   // arrowhead tip
+];
+
+function drawRetryIcon(scene, x, y) {
   const g = scene.add.graphics({ x, y }).setScrollFactor(0);
-  const radius = size * 0.27;
-  g.lineStyle(2, BUTTON_ICON_COLOR, 1);
-
-  const startAngle = -Math.PI * 0.68;
-  const endAngle = Math.PI * 0.58;
-  g.beginPath();
-  g.arc(0, 0, radius, startAngle, endAngle, false);
-  g.strokePath();
-
-  const tangent = endAngle + Math.PI / 2;
-  const cos = Math.cos(tangent);
-  const sin = Math.sin(tangent);
-  const arcTipX = radius * Math.cos(endAngle);
-  const arcTipY = radius * Math.sin(endAngle);
-  const headLen = size * 0.24;
-  const headWidth = size * 0.16;
-
-  const tipX = arcTipX + headLen * 0.6 * cos;
-  const tipY = arcTipY + headLen * 0.6 * sin;
-  const backX = arcTipX - headLen * 0.4 * cos;
-  const backY = arcTipY - headLen * 0.4 * sin;
-
   g.fillStyle(BUTTON_ICON_COLOR, 1);
-  g.beginPath();
-  g.moveTo(tipX, tipY);
-  g.lineTo(backX - headWidth * sin, backY + headWidth * cos);
-  g.lineTo(backX + headWidth * sin, backY - headWidth * cos);
-  g.closePath();
-  g.fillPath();
+  RETRY_ICON_RECTS.forEach(([rx, ry, rw, rh]) => g.fillRect(rx, ry, rw, rh));
   return g;
 }
 

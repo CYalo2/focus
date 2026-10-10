@@ -251,16 +251,27 @@ export class LevelSelectScene extends Phaser.Scene {
             const levelNumber = i + 1;
             const borderWidth = levelNumber % 6 === 0 ? TILE_BORDER_WIDTH * 2 : TILE_BORDER_WIDTH;
 
-            const card = this.add.rectangle(x, y, TILE_SIZE, TILE_SIZE, unlocked ? 0x222222 : 0x151515)
-                .setStrokeStyle(borderWidth, unlocked ? 0x555555 : 0x333333);
-            crispStroke(card);
+            const outerSize = TILE_SIZE + borderWidth;
+            const left = Math.round(x - outerSize / 2);
+            const top = Math.round(y - outerSize / 2);
 
-            const innerBorder = this.add.rectangle(
-                x, y,
-                TILE_SIZE - borderWidth * 2,
-                TILE_SIZE - borderWidth * 2
-            ).setStrokeStyle(borderWidth, unlocked ? LEVELS[i].backgroundColor : 0x222222);
-            crispStroke(innerBorder);
+            const card = this.add.rectangle(left, top, outerSize, outerSize, unlocked ? 0x222222 : 0x151515)
+                .setOrigin(0, 0);
+
+            const borders = this.add.graphics();
+            const drawRing = (ringLeft, ringTop, size, color) => {
+                borders.fillStyle(color, 1);
+                borders.fillRect(ringLeft, ringTop, size, borderWidth);
+                borders.fillRect(ringLeft, ringTop + size - borderWidth, size, borderWidth);
+                borders.fillRect(ringLeft, ringTop + borderWidth, borderWidth, size - borderWidth * 2);
+                borders.fillRect(ringLeft + size - borderWidth, ringTop + borderWidth, borderWidth, size - borderWidth * 2);
+            };
+            const drawBorders = (outerColor) => {
+                borders.clear();
+                drawRing(left, top, outerSize, outerColor);
+                drawRing(left + borderWidth, top + borderWidth, outerSize - borderWidth * 2, unlocked ? LEVELS[i].backgroundColor : 0x222222);
+            };
+            drawBorders(unlocked ? 0x555555 : 0x333333);
 
             const content = unlocked
                 ? this.add.text(x, y, `${i + 1}`, { fontSize: "24px", color: "#ffffff" }).setOrigin(0.5)
@@ -268,12 +279,12 @@ export class LevelSelectScene extends Phaser.Scene {
 
             if (unlocked) {
                 card.setInteractive({ useHandCursor: true });
-                card.on("pointerover", () => card.setStrokeStyle(borderWidth, LEVELS[i].backgroundColor));
-                card.on("pointerout", () => card.setStrokeStyle(borderWidth, 0x555555));
+                card.on("pointerover", () => drawBorders(LEVELS[i].backgroundColor));
+                card.on("pointerout", () => drawBorders(0x555555));
                 card.on("pointerdown", () => this.openLevelDetails(i));
             }
 
-            this.gridContainer.add([card, innerBorder, content]);
+            this.gridContainer.add([card, borders, content]);
         }
 
         const hasPageLeft = this.page > 0;

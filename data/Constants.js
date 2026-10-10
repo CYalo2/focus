@@ -1,6 +1,6 @@
 export const BACKGROUND_COLOR = 0x1a1a22;
 
-export const BULLET_TIME_MULTIPLIER = 0.5;
+export const BULLET_TIME_MULTIPLIER = 0.25;
 
 export const GAME_WIDTH = 640;
 export const GAME_HEIGHT = 360;

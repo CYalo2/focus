@@ -37,11 +37,10 @@ const config = {
     pixelArt: true,
     roundPixels: true,
 
-    // Rendered at screen resolution (see ui/DisplayScale.js); the size is set from the window below.
     scale: {
         mode: Phaser.Scale.NONE,
         zoom: 1 / (window.devicePixelRatio || 1),
-        autoCenter: Phaser.Scale.NO_CENTER // centred by fitToWindow instead, on a whole device pixel
+        autoCenter: Phaser.Scale.NO_CENTER
     },
 
     input: {
@@ -76,8 +75,6 @@ const config = {
 
 const game = new Phaser.Game(config);
 
-// Largest whole number of *device* pixels per game pixel that fits the window (so it stays crisp on
-// 125%/150% display scaling too). Below 1x the game just shrinks to fit.
 function computeLayout() {
     const dpr = window.devicePixelRatio || 1;
     const fit = Math.min(window.innerWidth * dpr / GAME_WIDTH, window.innerHeight * dpr / GAME_HEIGHT);
@@ -93,7 +90,6 @@ function fitToWindow() {
     game.scale.refresh();
     game.scene.getScenes(true).forEach(applyDisplayCamera);
 
-    // Centre on a whole device pixel too; a half-pixel offset also makes everything uneven.
     const container = document.getElementById("game-container");
     const offsetX = Math.max(0, Math.floor((window.innerWidth * dpr - width) / 2));
     const offsetY = Math.max(0, Math.floor((window.innerHeight * dpr - height) / 2));

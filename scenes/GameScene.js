@@ -7,11 +7,12 @@ import { Enemy } from "../entity/Enemy.js";
 import { createPlatforms, createGoal } from "../entity/Platform.js";
 import { destroyOffscreenBullets, reorientBullet, redirectBullet } from "../entity/Bullet.js";
 import { Hud } from "../ui/Hud.js";
+import { Highlighter } from "../fx/Highlighter.js";
 import { showEndScreen } from "../ui/EndScreen.js";
 import { SeededRandom } from "../data/SeededRandom.js";
 import { showPauseMenu } from "../ui/PauseMenu.js";
 import { spawnBulletBreakParticles, spawnBulletBounceParticles, spawnEnemyDeathParticles, startGoalActivationParticles, spawnPlatformHitParticles, spawnPlatformBreakParticles } from "../fx/Particles.js";
-import { recordLevelCompletion, notifyGameplayStart, notifyGameplayStop, getAutoAim, getChallengeMode, getChargeVignetteEnabled } from "../save/SaveManager.js";
+import { recordLevelCompletion, notifyGameplayStart, notifyGameplayStop, getAutoAim, getChallengeMode, getChargeVignetteEnabled, isChallengeModeEnabled } from "../save/SaveManager.js";
 import { HINT_RECORDING_ENABLED, HintRecorder, HintPlayback, fromB36 } from "../data/HintReplay.js";
 import { setBulletTimeAudioEffect } from "../save/AudioManager.js";
 import { applyDisplayCamera, getZoom, pointerToGame, snapToDevicePixel } from "../ui/DisplayScale.js";
@@ -21,8 +22,10 @@ const CAMERA_FOLLOW_LERP = 0.1;
 const CHEAT = false; // not hit by projectiles
 const AIM_RAY_LENGTH = 500;
 
-const RETRY_FLASH_DURATION_MS = 120;
-const RETRY_FLASH_ALPHA = 0.12;
+const RETRY_FLASH_DURATION_MS = 170;
+const RETRY_FLASH_ALPHA = 0.3;
+
+let settingsPrimed = false;
 
 const heldKeyCodes = new Set();
 window.addEventListener("keydown", (e) => heldKeyCodes.add(e.keyCode));
@@ -71,11 +74,13 @@ export class GameScene extends Phaser.Scene {
 
     this.weapon = WEAPONS[level.weapon];
 
-    await getAutoAim();
-
-    this.challengeModeEnabled = await getChallengeMode();
-
-    await getChargeVignetteEnabled();
+    if (!settingsPrimed) {
+      await getAutoAim();
+      await getChallengeMode();
+      await getChargeVignetteEnabled();
+      settingsPrimed = true;
+    }
+    this.challengeModeEnabled = isChallengeModeEnabled();
 
     this.bulletTimeActive = false;
     this.gameEnded = false;
@@ -219,6 +224,12 @@ export class GameScene extends Phaser.Scene {
 
     this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => this.hitEnemy(bullet, enemy));
     this.physics.add.overlap(this.enemyBullets, this.player, (player, bullet) => this.hitPlayer(bullet));
+
+    this.highlighter = new Highlighter(this, {
+      enemies: this.enemies,
+      enemyBullets: this.enemyBullets,
+      breakablePlatforms: this.platformsBreakable,
+    });
     this.physics.add.overlap(this.player, this.goal, () => {
       if (this.enemies.countActive(true) === 0) {
         this.winLevel();
@@ -255,8 +266,9 @@ export class GameScene extends Phaser.Scene {
       if (event.repeat) return;
       this.togglePause();
     });
-    this.input.keyboard.on("keydown-R", () => {
+    this.input.keyboard.on("keydown-R", (event) => {
       if (this.isHintPlayback) return;
+      if (event.repeat) return;
       if (this.isPaused) {
         this.retryLevel();
       } else {
@@ -292,6 +304,14 @@ export class GameScene extends Phaser.Scene {
     return { x: x - cam.scrollX, y: y - cam.scrollY };
   }
 
+  updatePointerWorld() {
+    const pointer = this.input.activePointer;
+    const cam = this.cameras.main;
+    const p = pointerToGame(pointer);
+    pointer.worldX = p.x + cam.scrollX;
+    pointer.worldY = p.y + cam.scrollY;
+  }
+
   cameraTarget() {
     const viewW = GAME_WIDTH;
     const viewH = GAME_HEIGHT;
@@ -315,6 +335,11 @@ export class GameScene extends Phaser.Scene {
     const y = cam.scrollY + (target.y - cam.scrollY) * CAMERA_FOLLOW_LERP;
 
     cam.setScroll(snapToDevicePixel(x), snapToDevicePixel(y));
+
+    if (!this.isHintPlayback && this.sceneReady && !this.isPaused && !this.gameEnded) {
+      this.updatePointerWorld();
+      this.player.refreshWeaponAim(this.input.activePointer);
+    }
   }
 
   togglePause() {
@@ -771,6 +796,8 @@ export class GameScene extends Phaser.Scene {
       destroyOffscreenBullets(this.enemyBullets, this.worldBounds, BULLET_OFFSCREEN_MARGIN);
     }
 
+    this.highlighter.update(time, delta);
+
     this.hud.update({
       enemiesLeft: this.enemies.countActive(true),
       bulletTimeActive: true,
@@ -821,7 +848,7 @@ export class GameScene extends Phaser.Scene {
 
     this.downHeld = this.cursors.down.isDown || this.keys.S.isDown;
 
-    this.input.activePointer.updateWorldPoint(this.cameras.main);
+    this.updatePointerWorld();
 
     let hintInputs;
     if (HINT_RECORDING_ENABLED) {
@@ -869,6 +896,8 @@ export class GameScene extends Phaser.Scene {
       destroyOffscreenBullets(this.playerBullets, this.worldBounds, BULLET_OFFSCREEN_MARGIN);
       destroyOffscreenBullets(this.enemyBullets, this.worldBounds, BULLET_OFFSCREEN_MARGIN);
     }
+
+    this.highlighter.update(time, delta);
 
     const enemiesLeft = this.enemies.countActive(true);
     this.hud.update({
